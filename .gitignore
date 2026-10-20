@@ -1,5 +1,5 @@
-# Created by https://www.toptal.com/developers/gitignore/api/flutter,dart,python,android,macos,windows,firebase
-# Edit at https://www.toptal.com/developers/gitignore?templates=flutter,dart,python,android,macos,windows,firebase
+# Created by https://www.toptal.com/developers/gitignore/api/flutter,dart,python,macos,windows,web,android,firebase
+# Edit at https://www.toptal.com/developers/gitignore?templates=flutter,dart,python,macos,windows,web,android,firebase
 
 ### Android ###
 # Gradle files
@@ -344,6 +344,21 @@ poetry.toml
 # LSP config files
 pyrightconfig.json
 
+### Web ###
+*.asp
+*.cer
+*.csr
+*.css
+*.htm
+*.html
+*.js
+*.jsp
+*.php
+*.rss
+*.wasm
+*.wat
+*.xhtml
+
 ### Windows ###
 # Windows thumbnail cache files
 Thumbs.db
@@ -370,4 +385,4 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
-# End of https://www.toptal.com/developers/gitignore/api/flutter,dart,python,android,macos,windows,firebase
+# End of https://www.toptal.com/developers/gitignore/api/flutter,dart,python,macos,windows,web,android,firebase
