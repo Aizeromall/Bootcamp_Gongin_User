@@ -7,7 +7,7 @@ class Headquarter {
   final String h_department;            // 부서
   final String h_name;                  // 이름
   final String h_phone;                 // 전화번호
-  final DateTime h_resiqnationdate;     // 퇴사일
+  final DateTime? h_resignationdate;    // 퇴사일
   final DateTime h_startdate;           // 입사일
 
   Headquarter(
@@ -18,12 +18,12 @@ class Headquarter {
       required this.h_department,
       required this.h_name,
       required this.h_phone,
-      required this.h_resiqnationdate,
+      this.h_resignationdate,           // nullable이라 안 넘기면 null
       required this.h_startdate
     }
   );
 
-  // 서버에서 받은 JSON -> Student객체 
+  // 서버에서 받은 JSON -> Headquarter객체 
   factory Headquarter.fromJson(Map<String, dynamic> json) {
     return Headquarter(
       h_id: json['h_id'] ?? "__",
@@ -32,8 +32,8 @@ class Headquarter {
       h_department: json['h_department'] ?? "__",
       h_name: json['h_name'] ?? "__",
       h_phone: json['h_phone'] ?? "__",
-      h_resiqnationdate: json['h_resiqnationdate'] ?? "__",
-      h_startdate: json['h_startdate'] ?? "__"
+      h_resignationdate: DateTime.tryParse(json['h_resignationdate'] ?? ''),
+      h_startdate: DateTime.parse(json['h_startdate']),
     );
   }
 
@@ -45,8 +45,9 @@ class Headquarter {
       'h_department': h_department,
       'h_name': h_name,
       'h_phone': h_phone,
-      'h_resiqnationdate': h_resiqnationdate,
-      'h_startdate': h_startdate,
+      'h_resignationdate': h_resignationdate?.toIso8601String(),
+      'h_startdate': h_startdate.toIso8601String(),
+
     };
   }
 }
