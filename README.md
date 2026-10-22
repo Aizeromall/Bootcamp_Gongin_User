@@ -1,4 +1,4 @@
-# bootcamp_project_gongin_user_app
+# bootcamp_project_gongin_admin_app
 
 A new Flutter project.
 

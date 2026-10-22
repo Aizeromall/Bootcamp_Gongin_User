@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="bootcamp_project_gongin_user_app"
+        android:label="bootcamp_project_gongin_admin_app"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
