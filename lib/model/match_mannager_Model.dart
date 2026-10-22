@@ -1,6 +1,6 @@
 // ###  2026.10.22 구장매니저 모델 클래스 구성   - 신현진
 
-class MatchMannager {
+class MatchManager {
   final String m_id;                        // 매니저ID
   final String m_pw;                        // Password
   final String m_name;                      // 이름
@@ -8,7 +8,7 @@ class MatchMannager {
   final String m_gender;                    // 성별
   final String m_workplace;                 // 근무지
 
-  MatchMannager(
+  MatchManager(
     {
       required this.m_id,
       required this.m_pw,
@@ -19,9 +19,9 @@ class MatchMannager {
     }
   );
 
-  // 서버에서 받은 JSON -> Student객체 
-  factory MatchMannager.fromJson(Map<String, dynamic> json) {
-    return MatchMannager(
+  // 서버에서 받은 JSON -> MatchManager객체 
+  factory MatchManager.fromJson(Map<String, dynamic> json) {
+    return MatchManager(
       m_id: json['m_id'] ?? "__",
       m_pw: json['m_pw'] ?? "__",
       m_name: json['m_name'] ?? "__",
