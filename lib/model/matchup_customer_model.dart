@@ -13,7 +13,7 @@ class Customer {
   final String c_position;               // 선호포지션
   final String c_category;               // 종목
   final DateTime c_signupdate;           // 가입일
-  final DateTime c_deletedate;           // 탈퇴일
+  final DateTime? c_deletedate;          // 탈퇴일
 
   Customer(
     {
@@ -29,11 +29,11 @@ class Customer {
       required this.c_position,
       required this.c_category,
       required this.c_signupdate,
-      required this.c_deletedate,
+      this.c_deletedate,
     }
   );
 
-  // 서버에서 받은 JSON -> Student객체 
+  // 서버에서 받은 JSON -> Customer객체 
   factory Customer.fromJson(Map<String, dynamic> json) {
     return Customer(
       c_id_seq: json['c_id_seq'] ?? "__",
@@ -43,12 +43,12 @@ class Customer {
       c_address: json['c_address'] ?? "__",
       c_phone: json['c_phone'] ?? "__",
       c_gender: json['c_gender'] ?? "__",
-      c_birthday: json['c_birthday'] ?? "__",
+      c_birthday: DateTime.parse(json['c_birthday']),
       c_team: json['c_team'] ?? "__",
       c_position: json['c_position'] ?? "__",
       c_category: json['c_category'] ?? "__",
-      c_signupdate: json['c_signupdate'] ?? "__",
-      c_deletedate: json['c_deletedate'] ?? "__"
+      c_signupdate: DateTime.parse(json['c_signupdate']),
+      c_deletedate: DateTime.tryParse(json['c_deletedate'] ?? '')
     );
   }
 
@@ -61,12 +61,12 @@ class Customer {
       'c_address': c_address,
       'c_phone': c_phone,
       'c_gender': c_gender,
-      'c_birthday': c_birthday,
+      'c_birthday': c_birthday.toIso8601String(),
       'c_team': c_team,
       'c_position': c_position,
       'c_category': c_category,
-      'c_signupdate': c_signupdate,
-      'c_deletedate': c_deletedate,
+      'c_signupdate': c_signupdate.toIso8601String(),
+      'c_deletedate': c_deletedate?.toIso8601String(),
     };
   }
 }
