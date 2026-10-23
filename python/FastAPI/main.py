@@ -16,9 +16,11 @@ from fastapi.middleware.cors import CORSMiddleware
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from FastAPI.auth import auth_router
+    from FastAPI.match import match_router
 else:
     # `python -m FastAPI.main` 모듈 실행에서는 일반 상대 import를 사용합니다.
     from .auth import auth_router
+    from .match import match_router
 
 # main.py → FastAPI → python → 프로젝트 루트 순서로 서버 환경 설정을 읽습니다.
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
@@ -58,6 +60,8 @@ def health() -> dict[str, str]:
 
 # 인증 router: 회원가입·로그인 기능을 /auth 하위 경로로 연결합니다.
 app.include_router(auth_router, prefix="/auth")
+# 구장 예약 router: 종목별 회원 ID와 구장 코드를 reservation 테이블에 연결합니다.
+app.include_router(match_router, prefix="/match", tags=["Ground Reservation"])
 
 
 if __name__ == "__main__":
