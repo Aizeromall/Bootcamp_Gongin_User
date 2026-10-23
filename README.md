@@ -24,6 +24,8 @@ samples, guidance on mobile development, and a full API reference.
 - `login.py`: `POST /login` — `c_id_seq`, `c_pw` 기반의 로그인 정보를 검증합니다.
 - `match/reservation.py`: `POST /match/reservation` — 08:00~24:00의 2시간 슬롯으로 구장을 예약합니다.
 - `match/payment.py`: `POST /match/payment` — 예약 번호(`r_seq`)로 1인 이용금액을 결제합니다.
+
+회원가입 시 `c_rating`은 요청값으로 받지 않으며, 모든 생성 회원 레코드에 초기값 `1500`을 저장합니다.
 - `auth/__init__.py`: `login_router`, `register_router`를 내보냅니다. 서버 시작 파일에서
   `app.include_router(login_router, prefix="/auth")` 및
   `app.include_router(register_router, prefix="/auth")`로 연결합니다.

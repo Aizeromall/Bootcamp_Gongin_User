@@ -18,6 +18,19 @@ logger = logging.getLogger(__name__)
 PASSWORD_ITERATIONS = 600_000
 SPORT_NAMES = {1: "축구", 2: "농구", 3: "야구", 4: "배구"}
 
+# ********************************************************
+# 수정 일 : 2026-10-23
+# 수정 위치 : 회원가입 customer INSERT 및 c_rating 초기값 상수
+# 1. 수정 발생 위치 : register_customer()의 rows 생성 및 INSERT INTO customer 문
+# 2. 수정 내용 : DB customer 테이블의 새 c_rating NOT NULL 속성에 대한 초기값 누락
+# 3. 디버깅 내용 : c_rating 컬럼이 INT, NOT NULL, DEFAULT 1500임을 DB 구조에서 확인
+# 4. 테스트 사항 : Swagger 요청 스키마에 c_rating이 노출되지 않고, 가상 DB INSERT 행마다 1500 저장 확인
+# 5. 결과 및 추후 보완 사항 : 사용자는 등급을 선택할 수 없으며 가입 시 1500으로 고정합니다.
+#    등급 변경 정책은 별도 회원 등급 기능에서만 처리해야 합니다.
+# ********************************************************
+# c_rating은 회원이 직접 선택하지 않으며, 가입 시 고정 초기 점수로 생성합니다.
+DEFAULT_CUSTOMER_RATING = 1500
+
 
 class RegisterRequest(BaseModel):
     """회원가입에 필요한 값입니다. 필수 입력값은 공백을 허용하지 않습니다."""
@@ -108,6 +121,7 @@ def register_customer(payload: RegisterRequest) -> dict:
                     payload.c_team,
                     payload.c_position,
                     signup_date,
+                    DEFAULT_CUSTOMER_RATING,
                 )
                 # c_id_seq의 끝 번호는 종목 코드와 같아야 예약 종목을 판별할 수 있습니다.
                 for sport in payload.preferred_stocks
@@ -116,8 +130,8 @@ def register_customer(payload: RegisterRequest) -> dict:
                 """
                 INSERT INTO customer (
                     c_id_seq, c_prefer_stock, c_pw, c_name, c_address, c_phone,
-                    c_gender, c_birthday, c_team, c_position, c_signupdate
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    c_gender, c_birthday, c_team, c_position, c_signupdate, c_rating
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 rows,
             )
