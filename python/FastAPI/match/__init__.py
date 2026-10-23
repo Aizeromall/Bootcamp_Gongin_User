@@ -10,6 +10,7 @@ from .payment import router as payment_router
 from .payment_search import router as payment_search_router
 from .reservation import router as reservation_router
 from .reservation_search import router as reservation_search_router
+from .resultcheck import router as resultcheck_router
 
 match_router = APIRouter()
 # 구장 예약: 2시간 단위의 reservation 데이터를 생성합니다.
@@ -22,5 +23,7 @@ match_router.include_router(ground_search_router, tags=["Ground Search"])
 match_router.include_router(reservation_search_router, tags=["Reservation Search"])
 # 결제 조회: 회원별 결제 내역 / 예약별 결제 / 결제 1건을 조회합니다.
 match_router.include_router(payment_search_router, tags=["Payment Search"])
+# 경기결과 조회: 회원이 참여한 경기결과 목록 / 결과 1건을 조회합니다.
+match_router.include_router(resultcheck_router, tags=["Result Check"])
 
 # 최종 수정 일 : 2026-10-23
