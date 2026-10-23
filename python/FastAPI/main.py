@@ -18,11 +18,13 @@ if __package__ in (None, ""):
     from FastAPI.auth import auth_router
     from FastAPI.inquiry.inquiry import router as inquiry_router
     from FastAPI.match import match_router
+    from FastAPI.cancel import cancel_router                # 수정 : 신현진 2026.10.23
 else:
     # `python -m FastAPI.main` 모듈 실행에서는 일반 상대 import를 사용합니다.
     from .auth import auth_router
     from .inquiry.inquiry import router as inquiry_router
     from .match import match_router
+    from .cancel import cancel_router                       # 수정 : 신현진 2026.10.23
 
 # main.py → FastAPI → python → 프로젝트 루트 순서로 서버 환경 설정을 읽습니다.
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
@@ -67,6 +69,9 @@ app.include_router(match_router, prefix="/match", tags=["Ground Reservation"])
 
 # 문의 router: 문의 작성·내 문의 목록 기능을 /inquiry 하위 경로로 연결합니다.
 app.include_router(inquiry_router, prefix="/inquiry")
+
+# 취소 router: 회원 예약 취소 기능을 /cancel 하위 경로로 연결합니다.          # 수정 : 신현진 2026.10.23
+app.include_router(cancel_router, prefix="/cancel")
 
 
 if __name__ == "__main__":
