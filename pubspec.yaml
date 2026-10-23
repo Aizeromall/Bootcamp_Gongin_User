@@ -37,6 +37,8 @@ dependencies:
 
   # Riverpod
   riverpod: ^3.4.3
+  # Flutter 위젯에서 Riverpod 사용 (ProviderScope, ConsumerWidget, ref.watch)
+  flutter_riverpod: ^3.4.3
   # http
   http: ^1.6.0
   # Slidable

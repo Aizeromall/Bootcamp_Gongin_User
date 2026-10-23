@@ -26,7 +26,8 @@ class Ground {
   // 서버에서 받은 JSON -> Ground객체 
   factory Ground.fromJson(Map<String, dynamic> json) {
     return Ground(
-      g_code: json['g_code'] ?? "__",
+      // 서버(DB)는 g_code를 int로 보내므로 String으로 변환 (그대로 넣으면 타입 에러)
+      g_code: json['g_code']?.toString() ?? "__",
       g_name: json['g_name'] ?? "__",
       g_address: json['g_address'] ?? "__",
       g_num: json['g_num'] ?? 0,

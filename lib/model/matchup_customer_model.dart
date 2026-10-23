@@ -10,6 +10,7 @@ class Customer {
   final String c_gender;                 // 성별
   final DateTime c_birthday;             // 생년월일
   final String c_team;                   // 소속팀명
+  final int c_rating;                 // 점수
   final String c_position;               // 선호포지션
   final String c_category;               // 종목
   final DateTime c_signupdate;           // 가입일
@@ -26,6 +27,7 @@ class Customer {
       required this.c_gender,
       required this.c_birthday,
       required this.c_team,
+      required this.c_rating,
       required this.c_position,
       required this.c_category,
       required this.c_signupdate,
@@ -33,7 +35,20 @@ class Customer {
     }
   );
 
-  // 서버에서 받은 JSON -> Customer객체 
+  // c_id_seq(예: admin_01)를 마지막 '_' 기준으로 아이디 / 종목 번호로 나눔
+  // split('_')은 아이디에 '_'가 있으면(예: hong_gd_01) 여러 조각으로 나뉘어서 lastIndexOf 사용
+  // '_'가 없는 값이면 lastIndexOf가 -1이라 substring 에러가 나므로 아이디는 전체, 번호는 빈 문자열로 처리
+  String get c_id {
+    final index = c_id_seq.lastIndexOf('_');
+    return index == -1 ? c_id_seq : c_id_seq.substring(0, index);     // admin
+  }
+
+  String get c_seq {
+    final index = c_id_seq.lastIndexOf('_');
+    return index == -1 ? '' : c_id_seq.substring(index + 1);          // 01 (종목 번호: 01 축구 ~ 04 배구)
+  }
+
+  // 서버에서 받은 JSON -> Customer객체
   factory Customer.fromJson(Map<String, dynamic> json) {
     return Customer(
       c_id_seq: json['c_id_seq'] ?? "__",
@@ -45,6 +60,7 @@ class Customer {
       c_gender: json['c_gender'] ?? "__",
       c_birthday: DateTime.parse(json['c_birthday']),
       c_team: json['c_team'] ?? "__",
+      c_rating: json['c_rating'] ?? 0,
       c_position: json['c_position'] ?? "__",
       c_category: json['c_category'] ?? "__",
       c_signupdate: DateTime.parse(json['c_signupdate']),
@@ -63,6 +79,7 @@ class Customer {
       'c_gender': c_gender,
       'c_birthday': c_birthday.toIso8601String(),
       'c_team': c_team,
+      'c_rating': c_rating,
       'c_position': c_position,
       'c_category': c_category,
       'c_signupdate': c_signupdate.toIso8601String(),
