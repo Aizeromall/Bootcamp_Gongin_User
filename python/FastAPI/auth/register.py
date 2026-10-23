@@ -97,7 +97,7 @@ def register_customer(payload: RegisterRequest) -> dict:
             signup_date = date.today()
             rows = [
                 (
-                    f"{payload.c_id}_{sequence:02d}",
+                    f"{payload.c_id}_{sport:02d}",
                     sport,
                     password_hash,
                     payload.c_name,
@@ -109,7 +109,8 @@ def register_customer(payload: RegisterRequest) -> dict:
                     payload.c_position,
                     signup_date,
                 )
-                for sequence, sport in enumerate(payload.preferred_stocks, start=1)
+                # c_id_seq의 끝 번호는 종목 코드와 같아야 예약 종목을 판별할 수 있습니다.
+                for sport in payload.preferred_stocks
             ]
             cursor.executemany(
                 """
