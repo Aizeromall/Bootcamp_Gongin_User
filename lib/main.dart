@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 void main() {
-  runApp(const MyApp());
+  // ProviderScope : 앱 전체에서 Riverpod Provider를 쓸 수 있게 감싸는 최상위 위젯 (없으면 ref 사용 시 에러)
+  runApp(const ProviderScope(child: MyApp()));
 }
 
 class MyApp extends StatelessWidget {
