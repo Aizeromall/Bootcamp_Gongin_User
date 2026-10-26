@@ -9,6 +9,7 @@
 #   GET /match/reservation/ground/{g_code}?r_date=날짜   구장의 날짜별 시간대 예약 현황 (남은 자리)
 #   GET /match/reservation/{r_seq}                       예약 1건 상세 (예약/취소 상관없이 조회)
 # 조회만 하고 받는 값(body)이 없어서 BaseModel class 없음
+# 모든 예약 응답에 배정 경기매니저(m_id, m_name)를 함께 보냄 (reservation.m_id, 2026.10.26 추가)
 #
 # reservation.r_category : 예약 구분
 #   1 = 예약 (r_date = 경기일, r_cancel_date = NULL)
@@ -57,6 +58,8 @@ def reservation_to_dict(row: dict) -> dict:
         "g_code": row["g_code"],                 # 구장코드
         "g_name": row["g_name"],                 # 구장명 (ground JOIN)
         "g_address": row["g_address"],           # 구장 주소 (ground JOIN)
+        "m_id": row["m_id"],                     # 배정 경기매니저 ID (배정이 없으면 None)
+        "m_name": row["m_name"],                 # 경기매니저 이름 (match_manager JOIN)
         "r_date": row["r_date"],                 # 경기일 (예약한 날짜, 취소해도 그대로 유지)
         "r_category": row["r_category"],         # 카테고리 (1 예약 / 2 취소)
         "is_canceled": row["r_category"] == CATEGORY_CANCELED,  # 취소 여부 (앱에서 true/false로 바로 사용)
@@ -72,14 +75,16 @@ def reservation_to_dict(row: dict) -> dict:
 # 중간 수정 작성자 - 신현진
 # 수정일 2026.10.26
 # 예약 조회에서 공통으로 쓰는 SELECT
-# r / g / p 는 테이블 별칭 (reservation / ground / pay)
+# r / g / m / p 는 테이블 별칭 (reservation / ground / match_manager / pay)
 # INNER JOIN ground : 예약한 구장의 이름·주소를 함께 가져옴
+# LEFT JOIN match_manager : 배정 매니저 이름을 가져옴 (매니저가 없는 예약도 빠지지 않고 None)
 # LEFT JOIN pay : 결제 전인 예약도 빠지지 않고 나옴 (결제 값은 None)
 RESERVATION_SELECT = """
-    SELECT r.r_seq, r.c_id_seq, r.g_code, g.g_name, g.g_address,
+    SELECT r.r_seq, r.c_id_seq, r.g_code, g.g_name, g.g_address, r.m_id, m.m_name,
         r.r_date, r.rs_time, r.re_time, r.r_check, r.r_category, r.r_cancel_date, p.p_seq
     FROM reservation AS r
     INNER JOIN ground AS g ON g.g_code = r.g_code
+    LEFT JOIN match_manager AS m ON m.m_id = r.m_id
     LEFT JOIN pay AS p ON p.r_seq = r.r_seq
 """
 

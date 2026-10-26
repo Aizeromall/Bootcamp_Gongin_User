@@ -23,6 +23,30 @@ SPORT_BY_SEQUENCE = {1: "축구", 2: "농구", 3: "야구", 4: "배구"}
 CUSTOMER_SEQUENCE_PATTERN = re.compile(r"^.+_0([1-4])$")
 
 
+# 중간 수정 작성자 - 신현진
+# 수정일 2026.10.26
+def find_assigned_manager(cursor, g_code, target_date: date) -> dict | None:
+    """target_date에 g_code 구장에 배정된 경기매니저(m_id, m_name)를 찾습니다.
+
+    assign.a_start / a_end가 비어 있으면 기간 제한이 없는 배정으로 봅니다.
+    배정이 여러 건이면 시작일이 가장 최근인 배정을 사용하고, 없으면 None을 반환합니다.
+    예약 생성(reservation.py)과 구장 조회(ground_search.py)에서 함께 사용합니다.
+    """
+
+    cursor.execute(
+        """SELECT a.m_id, m.m_name
+            FROM assign AS a
+            INNER JOIN match_manager AS m ON m.m_id = a.m_id
+            WHERE a.g_code = %s
+                AND (a.a_start IS NULL OR a.a_start <= %s)
+                AND (a.a_end IS NULL OR a.a_end >= %s)
+            ORDER BY a.a_start DESC, a.assign_seq DESC
+            LIMIT 1""",
+        (g_code, target_date, target_date),
+    )
+    return cursor.fetchone()
+
+
 def sport_from_customer_id(customer_id_sequence: str) -> str:
     """c_id_seq 마지막 번호로 예약 가능한 종목을 확인합니다."""
 
@@ -77,6 +101,14 @@ def create_reservation(
 
             # 중간 수정 작성자 - 신현진
             # 수정일 2026.10.26
+            # 경기일(r_date)에 이 구장에 배정된 경기매니저를 assign 테이블에서 찾습니다.
+            # 앱은 매니저 ID를 모르기 때문에 서버가 찾아서 reservation.m_id에 저장합니다.
+            # 배정된 매니저가 없으면 None으로 저장해 예약 자체는 막지 않습니다.
+            manager = find_assigned_manager(cursor, g_code, r_date)
+            m_id = manager["m_id"] if manager else None
+
+            # 중간 수정 작성자 - 신현진
+            # 수정일 2026.10.26
             # 같은 회원의 같은 구장·날짜·시간 중복 예약을 막습니다.
             # r_category = 1 : 취소(2)한 시간대는 다시 예약할 수 있게 예약 상태만 확인
             cursor.execute(
@@ -106,10 +138,11 @@ def create_reservation(
             # 수정일 2026.10.26
             # r_check는 생성 시 false이며, 정원이 찬 경우 아래에서 true로 갱신합니다.
             # r_category는 1(예약)로 저장합니다.
+            # m_id는 위에서 찾은 배정 경기매니저입니다. (배정이 없으면 NULL)
             cursor.execute(
-                """INSERT INTO reservation (g_code, c_id_seq, rs_time, re_time, r_date, r_check, r_category)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s)""",
-                (g_code, c_id_seq, rs_time, re_time, r_date, False, 1),
+                """INSERT INTO reservation (g_code, c_id_seq, m_id, rs_time, re_time, r_date, r_check, r_category)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                (g_code, c_id_seq, m_id, rs_time, re_time, r_date, False, 1),
             )
             # 예약 AI 값 r_seq는 결제 endpoint의 필수 입력값이므로 성공 응답에 포함합니다.
             r_seq = cursor.lastrowid
@@ -127,12 +160,17 @@ def create_reservation(
                     (True, g_code, r_date, rs_time),
                 )
 
+        # 중간 수정 작성자 - 신현진
+        # 수정일 2026.10.26
+        # 응답에 배정 경기매니저 ID·이름을 추가합니다. (배정이 없으면 None)
         connection.commit()
         return {
             "result": "OK", "r_seq": r_seq, "c_id_seq": c_id_seq, "sport": sport_name,
             "g_code": g_code, "r_date": r_date, "rs_time": rs_time,
             "re_time": re_time, "r_check": is_full,
             "remaining_capacity": ground["g_num"] - reservation_count - 1,
+            "m_id": m_id,
+            "m_name": manager["m_name"] if manager else None,
         }
     except HTTPException:
         if connection is not None:
@@ -152,4 +190,4 @@ def create_reservation(
         if connection is not None:
             connection.close()
 
-# 최종 수정 일 : 2026-10-26 수정자 : 신현진
+# 최종 수정 일 : 2026-10-26 수정자 : 신현진 (경기매니저 m_id 연결)
