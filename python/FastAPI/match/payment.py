@@ -12,7 +12,7 @@ import pymysql
 from fastapi import APIRouter, Body, HTTPException, status
 
 from ..database import connect
-from .reservation_status import is_canceled
+from .reservation_status import RESERVATION_RENTAL, is_canceled
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -70,8 +70,10 @@ def create_payment(
             # 중간 수정 작성자 - 신현진
             # 수정일 2026.10.26
             # reservation과 ground를 함께 잠가 결제 도중 가격·예약 정보가 바뀌지 않게 합니다.
+            # reservation_category : 구장대여(2)는 결제 금액이 달라서 구분값도 함께 조회 (2026.10.26 신현진)
             cursor.execute(
-                """SELECT r.r_seq, r.c_id_seq, r.r_date, r.g_code, r.r_category, r.r_c_category, g.g_price, g.g_num
+                """SELECT r.r_seq, r.c_id_seq, r.r_date, r.g_code, r.reservation_category,
+                        r.r_category, r.r_c_category, g.g_price, g.g_num
                     FROM reservation AS r
                     INNER JOIN ground AS g ON g.g_code = r.g_code
                     WHERE r.r_seq = %s FOR UPDATE""",
@@ -98,7 +100,16 @@ def create_payment(
             if cursor.fetchone() is not None:
                 raise HTTPException(status_code=409, detail="해당 회원은 이미 이 예약을 결제했습니다.")
 
-            p_amount = calculate_payment_amount(reservation["g_price"], reservation["g_num"])
+            # 중간 수정 작성자 - 신현진
+            # 수정일 2026.10.26
+            # 결제 금액
+            #   실력매칭(1) : 구장 이용금액 ÷ 수용인원 (1인 금액)
+            #   구장대여(2) : 시간대 전체를 빌리므로 구장 이용금액 전체 (수용인원 1로 나눔)
+            #   값이 없으면 DB 기본값과 같은 1(실력매칭)로 봄
+            if reservation.get("reservation_category", 1) == RESERVATION_RENTAL:
+                p_amount = calculate_payment_amount(reservation["g_price"], 1)
+            else:
+                p_amount = calculate_payment_amount(reservation["g_price"], reservation["g_num"])
             # p_seq는 AI이므로, 임시 고유 번호로 INSERT한 뒤 lastrowid로 최종 p_num을 만듭니다.
             pending_p_num = f"pending_{secrets.token_hex(8)}"
             cursor.execute(
@@ -143,4 +154,4 @@ def create_payment(
         if connection is not None:
             connection.close()
 
-# 최종 수정 일 : 2026-10-26 / 작업자 : 양태건
+# 최종 수정 일 : 2026-10-26 / 작업자 : 양태건 / 수정자 : 신현진 (구장대여 결제 금액)

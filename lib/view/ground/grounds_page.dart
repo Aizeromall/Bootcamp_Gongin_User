@@ -46,8 +46,11 @@ class _GroundsPageState extends ConsumerState<GroundsPage> {
     load();
   }
 
+  // 중간 수정 작성자 - 신현진
+  // 수정일 2026.10.26
+  // 구장 조회 API 주소 변경 (/match/ground → /ground, 서버 ground 폴더로 이동)
   void load() {
-    results = ref.read(memberApiProvider).request('/match/ground');
+    results = ref.read(memberApiProvider).request('/ground');
   }
 
   void refresh() => setState(load);

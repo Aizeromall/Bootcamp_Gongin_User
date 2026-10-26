@@ -12,7 +12,15 @@ import pymysql
 from fastapi import APIRouter, Body, HTTPException, status
 
 from ..database import connect
-from .reservation_status import category_condition
+# 중간 수정 작성자 - 신현진
+# 수정일 2026.10.26
+# 예약 구분(reservation_category) 1 실력매칭 / 2 구장대여 조건을 함께 사용
+from .reservation_status import (
+    RESERVATION_MATCH,
+    RESERVATION_RENTAL,
+    category_condition,
+    reservation_type_condition,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -69,7 +77,7 @@ def sport_from_customer_id(customer_id_sequence: str) -> str:
     responses={
         400: {"description": "c_id_seq 또는 예약 시작 시간 형식 오류"},
         404: {"description": "고객 또는 구장 코드가 존재하지 않음"},
-        409: {"description": "중복 예약 또는 해당 시간의 구장 정원 초과"},
+        409: {"description": "중복 예약, 해당 시간의 구장 정원 초과 또는 구장 대여로 마감된 시간대"},
         422: {"description": "필수 요청값 검증 실패"},
         500: {"description": "DB 연결 또는 예약 처리 실패"},
     },
@@ -118,10 +126,11 @@ def create_reservation(
             # 수정일 2026.10.26
             # 같은 회원의 같은 구장·날짜·시간 중복 예약을 막습니다.
             # 취소 사유가 없는 기존 빈 상태 예약도 중복 예약 검사에 포함
+            # reservation_category = 1 : 실력매칭 예약끼리만 비교 (구장대여는 아래에서 따로 확인)
             cursor.execute(
                 f"""SELECT 1 FROM reservation
                     WHERE c_id_seq = %s AND g_code = %s AND r_date = %s AND rs_time = %s
-                        AND {category_condition(False)}
+                        AND {category_condition(False)} AND {reservation_type_condition(RESERVATION_MATCH)}
                     LIMIT 1 FOR UPDATE""",
                 (c_id_seq, g_code, r_date, rs_time),
             )
@@ -130,11 +139,27 @@ def create_reservation(
 
             # 중간 수정 작성자 - 신현진
             # 수정일 2026.10.26
+            # 구장대여(reservation_category = 2)로 시간대 전체가 빌려졌으면 실력매칭 예약을 막습니다.
+            # 취소 사유가 등록된 대여는 제외 (취소되면 다시 실력매칭 예약 가능)
+            cursor.execute(
+                f"""SELECT 1 FROM reservation
+                    WHERE g_code = %s AND r_date = %s AND rs_time = %s
+                        AND {category_condition(False)} AND {reservation_type_condition(RESERVATION_RENTAL)}
+                    LIMIT 1""",
+                (g_code, r_date, rs_time),
+            )
+            if cursor.fetchone() is not None:
+                raise HTTPException(status_code=409, detail="구장 대여로 마감된 시간대입니다.")
+
+            # 중간 수정 작성자 - 신현진
+            # 수정일 2026.10.26
             # 동일 슬롯의 예약 수와 ground.g_num 수용 인원을 비교합니다.
             # 취소 사유가 있는 예약은 정원 계산에서 제외
+            # reservation_category = 1 : 구장대여 행이 정원 1명으로 계산되지 않게 실력매칭만 셈
             cursor.execute(
                 f"""SELECT COUNT(*) AS reservation_count FROM reservation
-                    WHERE g_code = %s AND r_date = %s AND rs_time = %s AND {category_condition(False)}""",
+                    WHERE g_code = %s AND r_date = %s AND rs_time = %s
+                        AND {category_condition(False)} AND {reservation_type_condition(RESERVATION_MATCH)}""",
                 (g_code, r_date, rs_time),
             )
             reservation_count = cursor.fetchone()["reservation_count"]
@@ -146,10 +171,12 @@ def create_reservation(
             # r_check는 생성 시 false이며, 정원이 찬 경우 아래에서 true로 갱신합니다.
             # r_category는 1(예약)로 저장합니다.
             # 매니저 ID 컬럼이 없으므로 저장하지 않고 배정표로 조회합니다.
+            # reservation_category는 1(실력매칭)로 저장합니다.
             cursor.execute(
-                """INSERT INTO reservation (g_code, c_id_seq, rs_time, re_time, r_date, r_check, r_category, r_c_category)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
-                (g_code, c_id_seq, rs_time, re_time, r_date, False, "1", ""),
+                """INSERT INTO reservation
+                    (g_code, c_id_seq, rs_time, re_time, r_date, r_check, reservation_category, r_category, r_c_category)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                (g_code, c_id_seq, rs_time, re_time, r_date, False, RESERVATION_MATCH, "1", ""),
             )
             # 예약 AI 값 r_seq는 결제 endpoint의 필수 입력값이므로 성공 응답에 포함합니다.
             r_seq = cursor.lastrowid
@@ -161,9 +188,11 @@ def create_reservation(
                 # 수정일 2026.10.26
                 # 슬롯의 모든 예약을 true로 맞춰 조회 시 마감 상태를 일관되게 표시합니다.
                 # 취소 사유가 있는 예약은 마감 처리 대상에서 제외
+                # reservation_category = 1 : 실력매칭 예약만 마감 처리 (구장대여 r_check는 건드리지 않음)
                 cursor.execute(
                     f"""UPDATE reservation SET r_check = %s
-                        WHERE g_code = %s AND r_date = %s AND rs_time = %s AND {category_condition(False)}""",
+                        WHERE g_code = %s AND r_date = %s AND rs_time = %s
+                            AND {category_condition(False)} AND {reservation_type_condition(RESERVATION_MATCH)}""",
                     (True, g_code, r_date, rs_time),
                 )
 
@@ -197,4 +226,4 @@ def create_reservation(
         if connection is not None:
             connection.close()
 
-# 최종 수정 일 : 2026-10-26 / 작업자 : 양태건 (실제 배정 요일·시간 연결)
+# 최종 수정 일 : 2026-10-26 / 작업자 : 양태건 (실제 배정 요일·시간 연결) / 수정자 : 신현진 (구장 대여 시간대 차단)
