@@ -5,6 +5,7 @@
 #   GET /match/ground                  전체 구장 목록 (?keyword= 로 구장명/주소 검색 가능)
 #   GET /match/ground/{g_code}         구장 1건 상세
 # 조회만 하고 받는 값(body)이 없어서 BaseModel class 없음
+# 구장 응답에 오늘 기준 배정 경기매니저(m_id, m_name)를 함께 보냄 (assign 테이블, 2026.10.26 추가)
 import logging
 from typing import Optional
 
@@ -18,6 +19,8 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+# 중간 수정 작성자 - 신현진
+# 수정일 2026.10.26
 # DB에서 받은 구장 1줄(dict) → 앱으로 보낼 JSON(dict)으로 정리
 # database.py가 DictCursor를 쓰기 때문에 row["컬럼명"]으로 값을 꺼냄
 # (Flutter의 Ground.fromJson 키 이름과 똑같이 맞춤)
@@ -32,7 +35,34 @@ def ground_to_dict(row: dict) -> dict:
         "g_time": row["g_time"],                # 이용시간
         "g_lat": row["g_lat"],                  # 위도
         "g_lng": row["g_lng"],                  # 경도
+        "m_id": row["m_id"],                    # 오늘 기준 배정 경기매니저 ID (배정이 없으면 None)
+        "m_name": row["m_name"],                # 경기매니저 이름 (match_manager JOIN)
     }
+
+
+# 중간 수정 작성자 - 신현진
+# 수정일 2026.10.26
+# 구장 조회에서 공통으로 쓰는 SELECT
+# g / m 은 테이블 별칭 (ground / match_manager)
+# 오늘(CURDATE()) 이 구장에 배정된 매니저 1명을 assign에서 찾아 LEFT JOIN
+#   - a_start / a_end가 비어 있으면 기간 제한 없는 배정으로 봄
+#   - 배정이 여러 건이면 시작일이 가장 최근인 배정 1건만 사용 (LIMIT 1 → 구장이 중복으로 나오지 않음)
+#   - 배정이 없는 구장도 목록에서 빠지지 않고 m_id / m_name = None
+# (예약 생성 reservation.find_assigned_manager()와 같은 기준)
+GROUND_SELECT = """
+    SELECT g.g_code, g.g_name, g.g_address, g.g_num, g.g_price, g.g_information, g.g_time,
+        g.g_lat, g.g_lng, m.m_id, m.m_name
+    FROM ground AS g
+    LEFT JOIN match_manager AS m ON m.m_id = (
+        SELECT a.m_id
+        FROM assign AS a
+        WHERE a.g_code = g.g_code
+            AND (a.a_start IS NULL OR a.a_start <= CURDATE())
+            AND (a.a_end IS NULL OR a.a_end >= CURDATE())
+        ORDER BY a.a_start DESC, a.assign_seq DESC
+        LIMIT 1
+    )
+"""
 
 
 # 전체 구장 목록 조회
@@ -44,17 +74,18 @@ def select_grounds(keyword: Optional[str] = None):
     try:
         connection = connect()  # DB 연결
         with connection.cursor() as cursor:  # SQL을 실행할 커서 (with가 끝나면 자동으로 닫힘)
-            sql = """
-                SELECT g_code, g_name, g_address, g_num, g_price, g_information, g_time, g_lat, g_lng
-                FROM ground
-            """
+            # 중간 수정 작성자 - 신현진
+            # 수정일 2026.10.26
+            # 공통 SELECT(GROUND_SELECT)로 바꿔서 배정 매니저까지 함께 조회
+            # JOIN이 생겨서 컬럼 앞에 ground 별칭 g. 을 붙임
+            sql = GROUND_SELECT
             params = ()
             if keyword and keyword.strip():
                 # LIKE '%검색어%' : 앞뒤에 무엇이 와도 검색어가 포함되면 조회
-                sql += " WHERE g_name LIKE %s OR g_address LIKE %s"
+                sql += " WHERE g.g_name LIKE %s OR g.g_address LIKE %s"
                 like_keyword = f"%{keyword.strip()}%"
                 params = (like_keyword, like_keyword)
-            sql += " ORDER BY g_name"  # 구장명 가나다순 정렬
+            sql += " ORDER BY g.g_name"  # 구장명 가나다순 정렬
             cursor.execute(sql, params)  # %s 자리에 값이 순서대로 들어감 (SQL 인젝션 방지)
             rows = cursor.fetchall()  # 결과 전체를 dict 목록으로 받음
         # 구장이 하나도 없으면 빈 리스트 [] 가 나감 (에러 아님)
@@ -78,11 +109,11 @@ def select_ground(g_code: str):
     try:
         connection = connect()
         with connection.cursor() as cursor:
-            sql = """
-                SELECT g_code, g_name, g_address, g_num, g_price, g_information, g_lat, g_lng
-                FROM ground
-                WHERE g_code = %s
-            """
+            # 중간 수정 작성자 - 신현진
+            # 수정일 2026.10.26
+            # 공통 SELECT(GROUND_SELECT)로 바꿔서 배정 매니저까지 함께 조회
+            # (기존 SELECT에 g_time이 빠져 있어 ground_to_dict에서 KeyError → 500이 나던 문제도 함께 해결)
+            sql = GROUND_SELECT + " WHERE g.g_code = %s"
             cursor.execute(sql, (g_code,))  # 값이 1개여도 튜플이라 (g_code,) 처럼 쉼표 필요
             row = cursor.fetchone()  # 1건만 받음 (없으면 None)
         if row is None:
@@ -100,4 +131,4 @@ def select_ground(g_code: str):
         if connection is not None:
             connection.close()
 
-# 최종 수정 일 : 2026-10-23
+# 최종 수정 일 : 2026-10-26 수정자 : 신현진

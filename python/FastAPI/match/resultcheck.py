@@ -19,6 +19,8 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+# 중간 수정 작성자 - 신현진
+# 수정일 2026.10.26
 # DB에서 받은 결과 1줄(dict) → 앱으로 보낼 JSON(dict)으로 정리
 # database.py가 DictCursor를 쓰기 때문에 row["컬럼명"]으로 값을 꺼냄
 def result_to_dict(row: dict) -> dict:
@@ -31,6 +33,9 @@ def result_to_dict(row: dict) -> dict:
         "c_r_r_date": row["c_r_r_date"],            # 기록일
         "e_code": row["e_code"],                    # 종목코드
         "c_r_r_statcode": row["c_r_r_statcode"],    # 스탯코드
+        # 출석 여부 (DB 1/0 → true/false, 매니저가 아직 기록하지 않았으면 None)
+        # bool(None)은 false가 되어 "결석"으로 보이므로 None은 그대로 보냄
+        "c_r_r_attendance": None if row["c_r_r_attendance"] is None else bool(row["c_r_r_attendance"]),
         "g_code": row["g_code"],                    # 구장코드
         "g_name": row["g_name"],                    # 구장명 (ground JOIN)
         "g_address": row["g_address"],              # 구장 주소 (ground JOIN)
@@ -39,13 +44,16 @@ def result_to_dict(row: dict) -> dict:
     }
 
 
+# 중간 수정 작성자 - 신현진
+# 수정일 2026.10.26
 # 결과 조회에서 공통으로 쓰는 SELECT
 # c / g / m 은 테이블 별칭 (c_result_record / ground / match_manager)
 # INNER JOIN ground : 경기한 구장의 이름·주소를 함께 가져옴
 # INNER JOIN match_manager : 결과를 기록한 매니저 이름을 함께 가져옴
+# c.c_r_r_attendance : 출석 여부 컬럼 추가 (1 출석 / 0 결석)
 RESULT_SELECT = """
     SELECT c.c_r_r_seq, c.c_id_seq, c.c_r_r_team, c.c_r_r_code, c.c_r_r_score, c.c_r_r_date,
-        c.e_code, c.c_r_r_statcode, c.g_code, g.g_name, g.g_address, c.m_id, m.m_name
+        c.e_code, c.c_r_r_statcode, c.c_r_r_attendance, c.g_code, g.g_name, g.g_address, c.m_id, m.m_name
     FROM c_result_record AS c
     INNER JOIN ground AS g ON g.g_code = c.g_code
     INNER JOIN match_manager AS m ON m.m_id = c.m_id
@@ -108,4 +116,4 @@ def select_result(c_r_r_seq: int):
         if connection is not None:
             connection.close()
 
-# 최종 수정 일 : 2026-10-23
+# 최종 수정 일 : 2026-10-26 수정자 : 신현진
