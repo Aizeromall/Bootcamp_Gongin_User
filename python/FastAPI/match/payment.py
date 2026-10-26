@@ -41,7 +41,9 @@ def calculate_payment_amount(g_price: object, g_num: object) -> int:
         400: {"description": "c_id_seq가 비어 있음"},
         403: {"description": "예약 회원과 결제 요청 회원이 일치하지 않음"},
         404: {"description": "r_seq에 해당하는 예약 또는 구장 정보가 없음"},
-        409: {"description": "이미 결제된 예약 또는 유효하지 않은 구장 금액"},
+        # 중간 수정 작성자 - 신현진
+        # 수정일 2026.10.26
+        409: {"description": "이미 결제된 예약, 취소된 예약 또는 유효하지 않은 구장 금액"},
         422: {"description": "r_seq 또는 p_method 요청값 검증 실패"},
         500: {"description": "DB 연결 또는 결제 처리 실패"},
     },
@@ -64,9 +66,11 @@ def create_payment(
     try:
         connection = connect()
         with connection.cursor() as cursor:
+            # 중간 수정 작성자 - 신현진
+            # 수정일 2026.10.26
             # reservation과 ground를 함께 잠가 결제 도중 가격·예약 정보가 바뀌지 않게 합니다.
             cursor.execute(
-                """SELECT r.r_seq, r.c_id_seq, r.r_date, r.g_code, g.g_price, g.g_num
+                """SELECT r.r_seq, r.c_id_seq, r.r_date, r.g_code, r.r_category, g.g_price, g.g_num
                     FROM reservation AS r
                     INNER JOIN ground AS g ON g.g_code = r.g_code
                     WHERE r.r_seq = %s FOR UPDATE""",
@@ -78,6 +82,11 @@ def create_payment(
             # 요청 회원과 reservation FK 회원이 일치할 때만 결제를 진행합니다.
             if reservation["c_id_seq"] != c_id_seq:
                 raise HTTPException(status_code=403, detail="본인 예약에 대해서만 결제할 수 있습니다.")
+            # 중간 수정 작성자 - 신현진
+            # 수정일 2026.10.26
+            # 취소(r_category = 2)된 예약은 행이 남아 있어도 결제하지 않습니다.
+            if reservation["r_category"] == 2:
+                raise HTTPException(status_code=409, detail="취소된 예약은 결제할 수 없습니다.")
 
             # 검증된 reservation FK를 pay에도 저장하고, 예약당 한 번만 결제되게 합니다.
             cursor.execute(
@@ -132,4 +141,4 @@ def create_payment(
         if connection is not None:
             connection.close()
 
-# 최종 수정 일 : 2026-10-23
+# 최종 수정 일 : 2026-10-26 수정자 : 신현진

@@ -75,31 +75,41 @@ def create_reservation(
             if cursor.fetchone() is None:
                 raise HTTPException(status_code=404, detail="존재하지 않는 회원입니다.")
 
+            # 중간 수정 작성자 - 신현진
+            # 수정일 2026.10.26
             # 같은 회원의 같은 구장·날짜·시간 중복 예약을 막습니다.
+            # r_category = 1 : 취소(2)한 시간대는 다시 예약할 수 있게 예약 상태만 확인
             cursor.execute(
                 """SELECT 1 FROM reservation
                     WHERE c_id_seq = %s AND g_code = %s AND r_date = %s AND rs_time = %s
+                        AND r_category = 1
                     LIMIT 1 FOR UPDATE""",
                 (c_id_seq, g_code, r_date, rs_time),
             )
             if cursor.fetchone() is not None:
                 raise HTTPException(status_code=409, detail="이미 예약한 시간대입니다.")
 
+            # 중간 수정 작성자 - 신현진
+            # 수정일 2026.10.26
             # 동일 슬롯의 예약 수와 ground.g_num 수용 인원을 비교합니다.
+            # r_category = 1 : 취소된 예약은 자리를 차지하지 않으므로 제외
             cursor.execute(
                 """SELECT COUNT(*) AS reservation_count FROM reservation
-                    WHERE g_code = %s AND r_date = %s AND rs_time = %s""",
+                    WHERE g_code = %s AND r_date = %s AND rs_time = %s AND r_category = 1""",
                 (g_code, r_date, rs_time),
             )
             reservation_count = cursor.fetchone()["reservation_count"]
             if reservation_count >= ground["g_num"]:
                 raise HTTPException(status_code=409, detail="해당 시간대 예약이 마감되었습니다.")
 
+            # 중간 수정 작성자 - 신현진
+            # 수정일 2026.10.26
             # r_check는 생성 시 false이며, 정원이 찬 경우 아래에서 true로 갱신합니다.
+            # r_category는 1(예약)로 저장합니다.
             cursor.execute(
-                """INSERT INTO reservation (g_code, c_id_seq, rs_time, re_time, r_date, r_check)
-                   VALUES (%s, %s, %s, %s, %s, %s)""",
-                (g_code, c_id_seq, rs_time, re_time, r_date, False),
+                """INSERT INTO reservation (g_code, c_id_seq, rs_time, re_time, r_date, r_check, r_category)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+                (g_code, c_id_seq, rs_time, re_time, r_date, False, 1),
             )
             # 예약 AI 값 r_seq는 결제 endpoint의 필수 입력값이므로 성공 응답에 포함합니다.
             r_seq = cursor.lastrowid
@@ -107,10 +117,13 @@ def create_reservation(
                 raise RuntimeError("reservation.r_seq 자동 증가값을 가져오지 못했습니다.")
             is_full = reservation_count + 1 >= ground["g_num"]
             if is_full:
+                # 중간 수정 작성자 - 신현진
+                # 수정일 2026.10.26
                 # 슬롯의 모든 예약을 true로 맞춰 조회 시 마감 상태를 일관되게 표시합니다.
+                # r_category = 1 : 이미 취소된 예약은 마감 처리 대상에서 제외
                 cursor.execute(
                     """UPDATE reservation SET r_check = %s
-                        WHERE g_code = %s AND r_date = %s AND rs_time = %s""",
+                        WHERE g_code = %s AND r_date = %s AND rs_time = %s AND r_category = 1""",
                     (True, g_code, r_date, rs_time),
                 )
 
@@ -139,4 +152,4 @@ def create_reservation(
         if connection is not None:
             connection.close()
 
-# 최종 수정 일 : 2026-10-23
+# 최종 수정 일 : 2026-10-26 수정자 : 신현진
