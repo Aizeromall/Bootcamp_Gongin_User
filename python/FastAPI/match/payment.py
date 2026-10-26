@@ -12,6 +12,7 @@ import pymysql
 from fastapi import APIRouter, Body, HTTPException, status
 
 from ..database import connect
+from .reservation_status import is_canceled
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -70,7 +71,7 @@ def create_payment(
             # 수정일 2026.10.26
             # reservation과 ground를 함께 잠가 결제 도중 가격·예약 정보가 바뀌지 않게 합니다.
             cursor.execute(
-                """SELECT r.r_seq, r.c_id_seq, r.r_date, r.g_code, r.r_category, g.g_price, g.g_num
+                """SELECT r.r_seq, r.c_id_seq, r.r_date, r.g_code, r.r_category, r.r_c_category, g.g_price, g.g_num
                     FROM reservation AS r
                     INNER JOIN ground AS g ON g.g_code = r.g_code
                     WHERE r.r_seq = %s FOR UPDATE""",
@@ -84,8 +85,9 @@ def create_payment(
                 raise HTTPException(status_code=403, detail="본인 예약에 대해서만 결제할 수 있습니다.")
             # 중간 수정 작성자 - 신현진
             # 수정일 2026.10.26
-            # 취소(r_category = 2)된 예약은 행이 남아 있어도 결제하지 않습니다.
-            if reservation["r_category"] == 2:
+            # 디버그: 취소 사유가 등록된 예약도 재결제를 차단합니다.
+            # 작업자 : 양태건 / 최종 수정일 : 2026-10-26
+            if is_canceled(reservation):
                 raise HTTPException(status_code=409, detail="취소된 예약은 결제할 수 없습니다.")
 
             # 검증된 reservation FK를 pay에도 저장하고, 예약당 한 번만 결제되게 합니다.
@@ -141,4 +143,4 @@ def create_payment(
         if connection is not None:
             connection.close()
 
-# 최종 수정 일 : 2026-10-26 수정자 : 신현진
+# 최종 수정 일 : 2026-10-26 / 작업자 : 양태건

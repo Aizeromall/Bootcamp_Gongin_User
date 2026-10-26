@@ -1,5 +1,7 @@
 // 작업자 : 최현준
 // 최초 작업 일 : 2026-10-24
+// 디버그: 홈은 네 종목 탐색 GridView를 사용하고 다른 탭은 가입 종목 선택을 유지합니다.
+// 작업자 : 양태건 / 최종 수정일 : 2026-10-26
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -25,24 +27,46 @@ class _MemberHomeState extends ConsumerState<MemberHome> {
         .where(sports.containsKey)
         .toSet();
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text(
-          '공IN 중개사',
-          style: TextStyle(fontWeight: FontWeight.w800),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        title: const Text.rich(
+          TextSpan(
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF141A24),
+              fontSize: 25,
+            ),
+            children: [
+              TextSpan(text: '공 '),
+              TextSpan(
+                text: 'In',
+                style: TextStyle(
+                  color: Color(0xFF1976F9),
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+              TextSpan(text: ' 중개사'),
+            ],
+          ),
         ),
         actions: [
-          DropdownButton<int>(
-            value: ref.watch(sportProvider),
-            underline: const SizedBox(),
-            items: available
-                .map((s) => DropdownMenuItem(value: s, child: Text(sports[s]!)))
-                .toList(),
-            onChanged: (v) {
-              if (v != null) {
-                ref.read(sportProvider.notifier).select(v);
-              }
-            },
-          ),
+          if (tab != 0)
+            DropdownButton<int>(
+              value: ref.watch(sportProvider),
+              underline: const SizedBox(),
+              items: available
+                  .map(
+                    (s) => DropdownMenuItem(value: s, child: Text(sports[s]!)),
+                  )
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) {
+                  ref.read(sportProvider.notifier).select(v);
+                }
+              },
+            ),
           IconButton(
             tooltip: '로그아웃',
             onPressed: () => ref.read(sessionProvider.notifier).signOut(),
@@ -56,13 +80,12 @@ class _MemberHomeState extends ConsumerState<MemberHome> {
         const InquiryPage(),
       ][tab],
       bottomNavigationBar: NavigationBar(
+        backgroundColor: Colors.white,
+        indicatorColor: const Color(0xFFE8F0FF),
         selectedIndex: tab,
         onDestinationSelected: (v) => setState(() => tab = v),
         destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.stadium_outlined),
-            label: '구장 찾기',
-          ),
+          NavigationDestination(icon: Icon(Icons.home_outlined), label: '홈'),
           NavigationDestination(
             icon: Icon(Icons.receipt_long_outlined),
             label: '내 예약·결제',
@@ -76,4 +99,4 @@ class _MemberHomeState extends ConsumerState<MemberHome> {
     );
   }
 }
-// 최종 수정 일 : 2026-10-24
+// 최종 수정 일 : 2026-10-26 / 작업자 : 양태건

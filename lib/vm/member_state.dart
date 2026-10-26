@@ -34,4 +34,32 @@ final memberIdProvider = Provider<String>((ref) {
   final session = ref.watch(sessionProvider);
   return '${session?['c_id']}_${ref.watch(sportProvider).toString().padLeft(2, '0')}';
 });
-// 최종 수정 일 : 2026-10-24
+// 최종 수정 일 : 2026-10-26 / 작업자 : 양태건
+
+// 디버그: 구장 탐색 종목은 회원별 예약·결제에 사용하는 종목과 분리합니다.
+// 작업자 : 양태건 / 최종 수정일 : 2026-10-26
+class GroundSport extends Notifier<int> {
+  @override
+  int build() {
+    ref.watch(sessionProvider);
+    return ref.read(sportProvider);
+  }
+
+  void select(int value) => state = value;
+}
+
+final groundSportProvider = NotifierProvider<GroundSport, int>(GroundSport.new);
+
+class GroundRegion extends Notifier<String> {
+  @override
+  String build() {
+    ref.watch(sessionProvider);
+    return '전체 지역';
+  }
+
+  void select(String value) => state = value;
+}
+
+final groundRegionProvider = NotifierProvider<GroundRegion, String>(
+  GroundRegion.new,
+);

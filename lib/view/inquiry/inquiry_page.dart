@@ -63,6 +63,162 @@ class _InquiryPageState extends ConsumerState<InquiryPage> {
     }
   }
 
+  // 수정 일 : 2026-10-26 / 작업자 : 양태건
+  // 디버그: 기존 문의·답변을 유지하고 선택한 부모 ID로 추가 답변을 전송합니다.
+  Future<void> replyTo(Map<String, dynamic> row) async {
+    if (busy) return;
+    final id = memberId!;
+    final api = ref.read(memberApiProvider);
+    setState(() => busy = true);
+    try {
+      final formKey = GlobalKey<FormState>();
+      var text = '';
+      var sending = false;
+      String? errorText;
+      final sent = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, updateDialog) => PopScope(
+            canPop: !sending,
+            child: AlertDialog(
+              title: const Text('추가 답변 작성'),
+              content: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '답변 대상: ${row['title'] ?? row['post']}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        autofocus: true,
+                        readOnly: sending,
+                        maxLength: 5000,
+                        minLines: 3,
+                        maxLines: 6,
+                        decoration: const InputDecoration(
+                          labelText: '추가 답변 내용',
+                        ),
+                        onChanged: (value) => text = value,
+                        validator: (value) => (value ?? '').trim().isEmpty
+                            ? '답변 내용을 입력해 주세요.'
+                            : null,
+                      ),
+                      if (errorText != null)
+                        Text(
+                          errorText!,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: sending
+                      ? null
+                      : () => Navigator.pop(dialogContext, false),
+                  child: const Text('돌아가기'),
+                ),
+                FilledButton(
+                  onPressed: sending
+                      ? null
+                      : () async {
+                          if (!formKey.currentState!.validate()) return;
+                          updateDialog(() {
+                            sending = true;
+                            errorText = null;
+                          });
+                          try {
+                            await api.request(
+                              '/inquiry/insert',
+                              body: {
+                                'c_id_seq': id,
+                                'post': text.trim(),
+                                'i_comment_seq': row['i_seq'],
+                              },
+                            );
+                            if (dialogContext.mounted) {
+                              Navigator.pop(dialogContext, true);
+                            }
+                          } catch (error) {
+                            if (dialogContext.mounted) {
+                              updateDialog(() {
+                                sending = false;
+                                errorText = error.toString().replaceFirst(
+                                  'Exception: ',
+                                  '',
+                                );
+                              });
+                            }
+                          }
+                        },
+                  child: Text(sending ? '전송 중…' : '답변 보내기'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      if (sent == true && mounted) {
+        setState(load);
+        showMessage(context, '추가 답변이 등록되었습니다.');
+      }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  // 수정 일 : 2026-10-26 / 작업자 : 양태건
+  // 디버그: 원글과 모든 깊이의 후속 글, 기존 inquiry_detail 답변을 함께 표시합니다.
+  Widget conversationEntry(Map<String, dynamic> row) {
+    final level = int.tryParse('${row['level']}') ?? 0;
+    final answered = '${row['inquiry_detail'] ?? ''}'.trim().isNotEmpty;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        (level.clamp(0, 3) * 8).toDouble(),
+        12,
+        0,
+        12,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${level == 0 ? '문의' : '추가 문의'} · ${row['i_date']}',
+            style: const TextStyle(color: Color(0xFF647568)),
+          ),
+          const SizedBox(height: 8),
+          Text('${row['post']}'),
+          const SizedBox(height: 12),
+          if (answered) ...[
+            Text(
+              '답변 · ${row['h_name'] ?? '담당자'}',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            Text('${row['inquiry_detail']}'),
+            if (row['i_answer_date'] != null) Text('${row['i_answer_date']}'),
+          ] else
+            const Text('답변을 기다리고 있어요.'),
+          TextButton.icon(
+            key: ValueKey('replyTo${row['i_seq']}'),
+            onPressed: busy ? null : () => replyTo(row),
+            icon: const Icon(Icons.reply),
+            label: Text(answered ? '답변에 답변하기' : '추가 문의하기'),
+          ),
+          const Divider(),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final id = ref.watch(memberIdProvider);
@@ -86,6 +242,7 @@ class _InquiryPageState extends ConsumerState<InquiryPage> {
       const SizedBox(height: 16),
       TextField(
         controller: content,
+        readOnly: busy,
         maxLength: 5000,
         maxLines: 5,
         decoration: const InputDecoration(labelText: '문의 내용'),
@@ -100,6 +257,8 @@ class _InquiryPageState extends ConsumerState<InquiryPage> {
         retry: () => setState(load),
         item: (row) => Card(
           child: ExpansionTile(
+            key: PageStorageKey('inquiry:$id:${row['i_seq']}'),
+            maintainState: true,
             title: Text('${row['title']}'),
             subtitle: Text('${row['i_date']}'),
             children: [
@@ -108,13 +267,11 @@ class _InquiryPageState extends ConsumerState<InquiryPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('${row['post']}'),
-                    const Divider(),
-                    Text(
-                      row['inquiry_detail'] == null
-                          ? '답변을 기다리고 있어요.'
-                          : '답변: ${row['inquiry_detail']}',
-                    ),
+                    conversationEntry(row),
+                    for (final reply in (row['replies'] as List? ?? []))
+                      conversationEntry(
+                        Map<String, dynamic>.from(reply as Map),
+                      ),
                   ],
                 ),
               ),
@@ -125,4 +282,4 @@ class _InquiryPageState extends ConsumerState<InquiryPage> {
     ]);
   }
 }
-// 최종 수정 일 : 2026-10-24
+// 최종 수정 일 : 2026-10-26 / 작업자 : 양태건
