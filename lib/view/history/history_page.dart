@@ -15,12 +15,106 @@ class HistoryPage extends ConsumerStatefulWidget {
 
 class _HistoryPageState extends ConsumerState<HistoryPage> {
   String kind = 'reservation';
+  bool cancelBusy = false;
   String? memberId;
   late Future<Map<String, dynamic>> future;
   void load() {
-    future = ref
-        .read(memberApiProvider)
-        .request('/match/$kind/customer/${Uri.encodeComponent(memberId!)}');
+    // 디버그: 종목별 회원 ID와 예약번호로 결제를 연결하고 취소는 별도 조회합니다.
+    // 작업자 : 양태건 / 최종 수정일 : 2026-10-26
+    final api = ref.read(memberApiProvider);
+    final id = Uri.encodeComponent(memberId!);
+    final canceled = kind == 'cancel';
+    future = () async {
+      final responses = await Future.wait([
+        api.request(
+          '/match/reservation/customer/$id',
+          query: {'r_category': canceled ? '2' : '1'},
+        ),
+        if (!canceled) api.request('/match/payment/customer/$id'),
+      ]);
+      if (canceled) return responses.first;
+      final payments = {
+        for (final row in responses[1]['results'] as List) row['r_seq']: row,
+      };
+      return {
+        'results': [
+          for (final row in responses.first['results'] as List)
+            <String, dynamic>{...row, ...?payments[row['r_seq']]},
+        ],
+      };
+    }();
+  }
+
+  // 디버그: 기존 페이지의 대화상자에서 직접 작성한 사유를 전송합니다.
+  // 작업자 : 양태건 / 최종 수정일 : 2026-10-26
+  Future<void> cancelReservation(Map<String, dynamic> row, String id) async {
+    if (cancelBusy) return;
+    setState(() => cancelBusy = true);
+    try {
+      final formKey = GlobalKey<FormState>();
+      var text = '';
+      final reason = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('예약 취소'),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('${row['g_name']} 예약을 취소하시겠어요?'),
+                const SizedBox(height: 16),
+                TextFormField(
+                  autofocus: true,
+                  maxLength: 50,
+                  minLines: 2,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: '취소 사유',
+                    hintText: '취소 사유를 직접 입력해 주세요.',
+                  ),
+                  onChanged: (value) => text = value,
+                  validator: (value) =>
+                      (value ?? '').trim().isEmpty ? '취소 사유를 입력해 주세요.' : null,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('돌아가기'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (formKey.currentState!.validate()) {
+                  Navigator.pop(dialogContext, text.trim());
+                }
+              },
+              child: const Text('취소 확정'),
+            ),
+          ],
+        ),
+      );
+      if (reason == null || !mounted) return;
+      await ref
+          .read(memberApiProvider)
+          .request(
+            '/cancel/reservation/${row['r_seq']}',
+            method: 'DELETE',
+            query: {'c_id_seq': id, 'r_c_category': reason},
+          );
+      if (!mounted) return;
+      showMessage(context, '예약이 취소되었습니다.');
+      setState(() {
+        if (memberId == id) kind = 'cancel';
+        load();
+      });
+    } catch (error) {
+      if (mounted) showMessage(context, error);
+    } finally {
+      if (mounted) setState(() => cancelBusy = false);
+    }
   }
 
   @override
@@ -33,12 +127,12 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
     return pageContent([
       heading(
         '나의 플레이 기록',
-        '${sports[ref.watch(sportProvider)]} 예약과 결제 내역을 확인하세요.',
+        '${sports[ref.watch(sportProvider)]} 예약·결제와 취소 내역을 확인하세요.',
       ),
       SegmentedButton<String>(
         segments: const [
-          ButtonSegment(value: 'reservation', label: Text('예약')),
-          ButtonSegment(value: 'payment', label: Text('결제')),
+          ButtonSegment(value: 'reservation', label: Text('예약·결제')),
+          ButtonSegment(value: 'cancel', label: Text('취소')),
         ],
         selected: {kind},
         onSelectionChanged: (v) => setState(() {
@@ -74,7 +168,13 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
                 Text(
                   '${row['r_date']} · ${row['rs_time']} ~ ${row['re_time']}',
                 ),
-                if (kind == 'payment')
+                // 디버그: 취소일 대신 실제 취소 사유를 표시합니다.
+                // 작업자 : 양태건 / 최종 수정일 : 2026-10-26
+                if (kind == 'cancel')
+                  Text(
+                    '취소 사유: ${row['cancel_reason'] ?? {'1': '정원 미달', '2': '우천·기상 악화', '3': '노쇼 및 환불'}['${row['r_c_category']}'] ?? row['r_c_category'] ?? '사유 미등록'}',
+                  )
+                else if (row['is_paid'] == true && row['p_num'] != null)
                   Text(
                     '${row['p_amount']}원 · ${row['p_method']}\n결제번호 ${row['p_num']}',
                   )
@@ -82,24 +182,38 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
                   Text(row['is_paid'] == true ? '결제 기록 완료' : '결제 대기'),
                   if (row['is_paid'] != true)
                     FilledButton.tonal(
-                      onPressed: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute<void>(
-                            builder: (_) => PaymentPage(
-                              rSeq: row['r_seq'] as int,
-                              memberId: id,
-                              groundName: '${row['g_name']}',
-                            ),
-                          ),
-                        );
-                        if (mounted) {
-                          setState(load);
-                        }
-                      },
+                      onPressed: cancelBusy
+                          ? null
+                          : () async {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute<void>(
+                                  builder: (_) => PaymentPage(
+                                    rSeq: row['r_seq'] as int,
+                                    memberId: id,
+                                    groundName: '${row['g_name']}',
+                                  ),
+                                ),
+                              );
+                              if (mounted) {
+                                setState(load);
+                              }
+                            },
                       child: const Text('결제 이어하기'),
                     ),
                 ],
+                if (kind != 'cancel' &&
+                    row['r_check'] != true &&
+                    DateTime.tryParse('${row['r_date']}') != null &&
+                    !DateTime.parse('${row['r_date']}')
+                        .isBefore(DateUtils.dateOnly(DateTime.now())))
+                  TextButton.icon(
+                    onPressed: cancelBusy
+                        ? null
+                        : () => cancelReservation(row, id),
+                    icon: const Icon(Icons.cancel_outlined),
+                    label: const Text('예약 취소'),
+                  ),
               ],
             ),
           ),
@@ -108,4 +222,4 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
     ]);
   }
 }
-// 최종 수정 일 : 2026-10-24
+// 최종 수정 일 : 2026-10-26 / 작업자 : 양태건

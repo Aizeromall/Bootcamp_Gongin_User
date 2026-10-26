@@ -25,7 +25,34 @@ def make_title(row: dict) -> str:
     return INQUIRY_OPTION.get(row["i_option"]) or (row["post"] or "")[:30]
 
 
-# 내 문의 목록 조회: 회원 아이디(c_id_seq)로 본인이 작성한 원글(level 0)만 최신순으로 조회
+# 수정 일 : 2026-10-26 / 작업자 : 양태건
+# 디버그: 재귀 호출 없이 부모 관계를 따라 답변을 원글별로 묶어 깊은 대화도 표시합니다.
+def group_threads(rows: list[dict]) -> list[dict]:
+    children: dict[int, list[dict]] = {}
+    roots = []
+    for row in rows:
+        row["title"] = make_title(row)
+        if row["level"] == 0 and row["i_comment_seq"] is None:
+            roots.append(row)
+        elif row["i_comment_seq"] is not None:
+            children.setdefault(row["i_comment_seq"], []).append(row)
+    for root in roots:
+        replies = []
+        stack = list(reversed(children.get(root["i_seq"], [])))
+        seen = {root["i_seq"]}
+        while stack:
+            row = stack.pop()
+            if row["i_seq"] in seen:
+                continue
+            seen.add(row["i_seq"])
+            replies.append(row)
+            stack.extend(reversed(children.get(row["i_seq"], [])))
+        root["replies"] = replies
+        root["reply_count"] = len(replies)
+    return list(reversed(roots))
+
+
+# 내 원글과 그에 연결된 모든 깊이의 답변을 조회합니다.
 @router.get(
     "",
     responses={
@@ -51,20 +78,21 @@ def list_inquiry(
             cursor.execute(
                 """
                 SELECT q.i_seq, q.i_option, q.post, q.i_date, q.i_state,
+                       q.c_id_seq, q.level, q.i_comment_seq,
                        q.inquiry_detail, q.i_answer_date, q.h_id, h.h_name
                 FROM inquiry q
                 LEFT JOIN headquarter h ON h.h_id = q.h_id
-                WHERE q.level = 0 AND q.c_id_seq = %s
-                ORDER BY q.i_date DESC, q.i_seq DESC
+                WHERE q.c_id_seq = %s
+                ORDER BY q.i_date ASC, q.i_seq ASC
                 """,
                 (c_id_seq,),
             )
             rows = cursor.fetchall()
 
-        for row in rows:
-            row["title"] = make_title(row)
-        # total: 문의 내역 탭의 건수 배지용
-        return {"total": len(rows), "results": rows}
+        # 수정 일 : 2026-10-26 / 작업자 : 양태건
+        # total은 원글 건수를 유지하고 답변은 각 원글의 replies에 담습니다.
+        threads = group_threads(rows)
+        return {"total": len(threads), "results": threads}
     except HTTPException:
         raise
     except Exception:
@@ -73,3 +101,5 @@ def list_inquiry(
     finally:
         if connection is not None:
             connection.close()
+
+# 최종 수정 일 : 2026-10-26 / 작업자 : 양태건

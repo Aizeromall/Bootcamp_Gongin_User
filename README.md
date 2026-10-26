@@ -61,6 +61,20 @@ samples, guidance on mobile development, and a full API reference.
   `app.include_router(login_router, prefix="/auth")` 및
   `app.include_router(register_router, prefix="/auth")`로 연결합니다.
 
+### 종목별 회원가입 포지션 (2026-10-26, 양태건)
+
+`POST /auth/register`는 `preferred_stocks: [1, 2, 3, 4]`와
+`c_position: {"1": "FW", "2": "가드", "3": "투수", "4": "세터"}`를 받습니다.
+선택 종목과 포지션 키는 정확히 일치해야 하며 종목에 맞는 포지션만 허용합니다.
+4종목 선택 시 `회원ID_01`부터 `회원ID_04`까지 4행을 생성하고,
+각 행의 `c_position`에는 해당 종목의 포지션 문자열만 저장합니다.
+종목 번호는 축구=1, 농구=2, 야구=3, 배구=4로 고정되므로 야구만 선택해도 `_03`입니다.
+DB 스키마 변경은 없으며 기존 회원 데이터는 변경하지 않습니다.
+기존 문자열 `c_position` 요청은 422로 거부되므로 앱과 API를 함께 업데이트해야 합니다.
+
+모의 DB 테스트는 FastAPI, PyMySQL, python-dotenv, httpx 설치 환경에서
+프로젝트 루트 기준 `python3 -m unittest discover -s python/tests -v`로 실행합니다.
+
 ### 서버 실행
 
 `python/FastAPI/main.py`가 서버 진입점이며, DB 연결은 `python/FastAPI/database.py`가 담당합니다.
@@ -86,3 +100,31 @@ python3 python/FastAPI/main.py
 - 예약 성공 응답의 `r_seq`, 동일한 예약 회원의 `c_id_seq`, 선택한 문자열 결제 수단을 프런트엔드는 `/match/payment`로 전달합니다.
   `p_amount`는 `ground.g_price / ground.g_num`을 원 단위 반올림한 값, `p_date`는 예약의 `r_date`, `p_num`은 `g_code_p_seq`로 저장됩니다.
   서버가 `reservation.c_id_seq` FK와 요청값을 비교한 뒤, 일치할 때만 `pay.c_id_seq` FK를 저장합니다.
+
+### 취소 내역 조회 (2026-10-26, 양태건)
+
+`reservation.r_c_category`에 취소 사유가 있으면 취소 내역으로 분류합니다.
+사용자 앱은 취소 사유를 1~50자로 직접 입력받아 앞뒤 공백을 제거한 뒤 저장·표시합니다.
+기존 코드 `1`은 정원 미달, `2`는 우천·기상 악화, `3`은 노쇼 및 환불로 표시합니다.
+기존 사유 문자열도 표시하며, NULL·공백·`0`은 미등록으로 처리합니다.
+기존 `r_category=2` 취소 상태도 유지해서 조회합니다.
+`GET /match/reservation/customer/{c_id_seq}?r_category=1`은 예약·결제용,
+`r_category=2`는 취소 조회용입니다. 응답의 `cancel_reason`에 사유 표시명이 포함됩니다.
+
+취소 API는 `DELETE /cancel/reservation/{r_seq}`에 `c_id_seq`와 자유 입력
+`r_c_category` 쿼리를 필수로 받습니다. 앱에서는 예약·결제 카드의 **예약 취소** 버튼으로
+사유를 입력하고 **취소 확정**을 누르면 취소 탭으로 이동합니다.
+기존 본인 확인·지난 경기·확정 경기 제한을 유지합니다.
+취소일 컬럼을 추가하지 않으며, 경기일과 예약 행은 보존합니다.
+매니저는 별도 예약 컬럼 없이 배정표의 요일·시간으로 조회합니다.
+테스트는 실제 취소·결제 데이터 변경 없이 모의 DB로 수행합니다.
+
+### 홈 구장 탐색 (2026-10-26, 양태건)
+
+기존 홈에 축구·배구·농구·야구 4칸 GridView와 전체 지역 드롭다운을 제공합니다.
+구장 조회 API의 전체 결과를 설명 `g_information`의 `종목: 축구` 같은 명시 정보와
+주소의 시·도 기준으로 필터링합니다. 설명에 종목이 없으면 임의 분류하지 않습니다.
+이름/주소 검색과 지역·종목 선택을 함께 적용하며, 필터 변경 시 API를 다시 호출하지 않습니다.
+탐색 종목은 Riverpod의 `groundSportProvider`, 지역은 `groundRegionProvider`로 관리합니다.
+예약·결제 종목과 탐색 상태를 분리하여 미가입 종목도 조회할 수 있고,
+예약 직전에는 가입 종목을 확인한 뒤 종목별 회원 ID를 연결합니다.

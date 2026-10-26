@@ -12,6 +12,7 @@ import pymysql
 from fastapi import APIRouter, Body, HTTPException, status
 
 from ..database import connect
+from .reservation_status import category_condition
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -23,26 +24,32 @@ SPORT_BY_SEQUENCE = {1: "축구", 2: "농구", 3: "야구", 4: "배구"}
 CUSTOMER_SEQUENCE_PATTERN = re.compile(r"^.+_0([1-4])$")
 
 
-# 중간 수정 작성자 - 신현진
-# 수정일 2026.10.26
-def find_assigned_manager(cursor, g_code, target_date: date) -> dict | None:
-    """target_date에 g_code 구장에 배정된 경기매니저(m_id, m_name)를 찾습니다.
+# 디버그: 실제 assign은 요일 목록(a_day)과 시간 범위(a_time)를 저장합니다.
+# 작업자 : 양태건 / 최종 수정일 : 2026-10-26
+ASSIGN_DAY_CONDITION = """
+    FIND_IN_SET(
+        ELT(WEEKDAY(%s) + 1, '월', '화', '수', '목', '금', '토', '일'),
+        REPLACE(a.a_day, ' ', '')
+    ) > 0
+"""
 
-    assign.a_start / a_end가 비어 있으면 기간 제한이 없는 배정으로 봅니다.
-    배정이 여러 건이면 시작일이 가장 최근인 배정을 사용하고, 없으면 None을 반환합니다.
-    예약 생성(reservation.py)과 구장 조회(ground_search.py)에서 함께 사용합니다.
+
+def find_assigned_manager(cursor, g_code, target_date: date, rs_time: str, re_time: str) -> dict | None:
+    """경기 요일과 전체 예약 시간에 배정된 매니저를 찾고, 없으면 None을 반환합니다.
+
+    예: a_day='월,화,수,목,금', a_time='08:00~22:00'.
+    중복 배정은 최신 assign_seq를 우선하고, 24:00 종료도 시간으로 비교합니다.
     """
-
     cursor.execute(
-        """SELECT a.m_id, m.m_name
+        f"""SELECT a.m_id, m.m_name
             FROM assign AS a
             INNER JOIN match_manager AS m ON m.m_id = a.m_id
-            WHERE a.g_code = %s
-                AND (a.a_start IS NULL OR a.a_start <= %s)
-                AND (a.a_end IS NULL OR a.a_end >= %s)
-            ORDER BY a.a_start DESC, a.assign_seq DESC
+            WHERE a.g_code = %s AND {ASSIGN_DAY_CONDITION}
+                AND TIME_TO_SEC(%s) >= TIME_TO_SEC(TRIM(SUBSTRING_INDEX(a.a_time, '~', 1)))
+                AND TIME_TO_SEC(%s) <= TIME_TO_SEC(TRIM(SUBSTRING_INDEX(a.a_time, '~', -1)))
+            ORDER BY a.assign_seq DESC
             LIMIT 1""",
-        (g_code, target_date, target_date),
+        (g_code, target_date, rs_time, re_time),
     )
     return cursor.fetchone()
 
@@ -102,19 +109,19 @@ def create_reservation(
             # 중간 수정 작성자 - 신현진
             # 수정일 2026.10.26
             # 경기일(r_date)에 이 구장에 배정된 경기매니저를 assign 테이블에서 찾습니다.
-            # 앱은 매니저 ID를 모르기 때문에 서버가 찾아서 reservation.m_id에 저장합니다.
+            # 매니저는 실제 배정표로 조회하여 응답에 포함합니다.
             # 배정된 매니저가 없으면 None으로 저장해 예약 자체는 막지 않습니다.
-            manager = find_assigned_manager(cursor, g_code, r_date)
+            manager = find_assigned_manager(cursor, g_code, r_date, rs_time, re_time)
             m_id = manager["m_id"] if manager else None
 
             # 중간 수정 작성자 - 신현진
             # 수정일 2026.10.26
             # 같은 회원의 같은 구장·날짜·시간 중복 예약을 막습니다.
-            # r_category = 1 : 취소(2)한 시간대는 다시 예약할 수 있게 예약 상태만 확인
+            # 취소 사유가 없는 기존 빈 상태 예약도 중복 예약 검사에 포함
             cursor.execute(
-                """SELECT 1 FROM reservation
+                f"""SELECT 1 FROM reservation
                     WHERE c_id_seq = %s AND g_code = %s AND r_date = %s AND rs_time = %s
-                        AND r_category = 1
+                        AND {category_condition(False)}
                     LIMIT 1 FOR UPDATE""",
                 (c_id_seq, g_code, r_date, rs_time),
             )
@@ -124,10 +131,10 @@ def create_reservation(
             # 중간 수정 작성자 - 신현진
             # 수정일 2026.10.26
             # 동일 슬롯의 예약 수와 ground.g_num 수용 인원을 비교합니다.
-            # r_category = 1 : 취소된 예약은 자리를 차지하지 않으므로 제외
+            # 취소 사유가 있는 예약은 정원 계산에서 제외
             cursor.execute(
-                """SELECT COUNT(*) AS reservation_count FROM reservation
-                    WHERE g_code = %s AND r_date = %s AND rs_time = %s AND r_category = 1""",
+                f"""SELECT COUNT(*) AS reservation_count FROM reservation
+                    WHERE g_code = %s AND r_date = %s AND rs_time = %s AND {category_condition(False)}""",
                 (g_code, r_date, rs_time),
             )
             reservation_count = cursor.fetchone()["reservation_count"]
@@ -138,11 +145,11 @@ def create_reservation(
             # 수정일 2026.10.26
             # r_check는 생성 시 false이며, 정원이 찬 경우 아래에서 true로 갱신합니다.
             # r_category는 1(예약)로 저장합니다.
-            # m_id는 위에서 찾은 배정 경기매니저입니다. (배정이 없으면 NULL)
+            # 매니저 ID 컬럼이 없으므로 저장하지 않고 배정표로 조회합니다.
             cursor.execute(
-                """INSERT INTO reservation (g_code, c_id_seq, m_id, rs_time, re_time, r_date, r_check, r_category)
+                """INSERT INTO reservation (g_code, c_id_seq, rs_time, re_time, r_date, r_check, r_category, r_c_category)
                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
-                (g_code, c_id_seq, m_id, rs_time, re_time, r_date, False, 1),
+                (g_code, c_id_seq, rs_time, re_time, r_date, False, "1", ""),
             )
             # 예약 AI 값 r_seq는 결제 endpoint의 필수 입력값이므로 성공 응답에 포함합니다.
             r_seq = cursor.lastrowid
@@ -153,10 +160,10 @@ def create_reservation(
                 # 중간 수정 작성자 - 신현진
                 # 수정일 2026.10.26
                 # 슬롯의 모든 예약을 true로 맞춰 조회 시 마감 상태를 일관되게 표시합니다.
-                # r_category = 1 : 이미 취소된 예약은 마감 처리 대상에서 제외
+                # 취소 사유가 있는 예약은 마감 처리 대상에서 제외
                 cursor.execute(
-                    """UPDATE reservation SET r_check = %s
-                        WHERE g_code = %s AND r_date = %s AND rs_time = %s AND r_category = 1""",
+                    f"""UPDATE reservation SET r_check = %s
+                        WHERE g_code = %s AND r_date = %s AND rs_time = %s AND {category_condition(False)}""",
                     (True, g_code, r_date, rs_time),
                 )
 
@@ -190,4 +197,4 @@ def create_reservation(
         if connection is not None:
             connection.close()
 
-# 최종 수정 일 : 2026-10-26 수정자 : 신현진 (경기매니저 m_id 연결)
+# 최종 수정 일 : 2026-10-26 / 작업자 : 양태건 (실제 배정 요일·시간 연결)

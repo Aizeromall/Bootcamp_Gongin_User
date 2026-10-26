@@ -50,7 +50,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins or ["*"],
     allow_credentials=False,
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
 
@@ -85,4 +85,4 @@ if __name__ == "__main__":
         reload=False,
     )
 
-# 최종 수정 일 : 2026-10-23 수정자 : 김병재
+# 최종 수정 일 : 2026-10-26 / 작업자 : 양태건 (취소 API DELETE CORS 허용)

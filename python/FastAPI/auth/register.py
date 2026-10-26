@@ -9,7 +9,7 @@ from datetime import date
 
 import pymysql
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 
 from ..database import connect
 
@@ -17,6 +17,12 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 PASSWORD_ITERATIONS = 600_000
 SPORT_NAMES = {1: "축구", 2: "농구", 3: "야구", 4: "배구"}
+POSITION_OPTIONS = {
+    1: {"FW", "MF", "DF", "GK"},
+    2: {"센터", "가드", "포워드"},
+    3: {"투수", "포수", "내야수", "외야수"},
+    4: {"세터", "리베로", "센터", "레프트", "라이트"},
+}
 
 
 class RegisterRequest(BaseModel):
@@ -32,10 +38,12 @@ class RegisterRequest(BaseModel):
     c_gender: str = Field(min_length=1, max_length=20)
     c_birthday: date
     c_team: str = Field(min_length=1, max_length=100)
-    c_position: str = Field(min_length=1, max_length=100)
+    # 디버그: 요청은 종목번호별 포지션으로 받고 DB 각 행에는 해당 값만 저장합니다.
+    # 작업자 : 양태건 / 최종 수정일 : 2026-10-26
+    c_position: dict[int, str] = Field(min_length=1, max_length=4)
     preferred_stocks: list[int] = Field(min_length=1, max_length=4)
 
-    @field_validator("c_id", "c_name", "c_address", "c_phone", "c_gender", "c_team", "c_position", mode="before")
+    @field_validator("c_id", "c_name", "c_address", "c_phone", "c_gender", "c_team", mode="before")
     @classmethod
     def reject_blank_text(cls, value: object) -> object:
         if not isinstance(value, str):
@@ -51,6 +59,15 @@ class RegisterRequest(BaseModel):
         if len(values) != len(set(values)) or any(value not in SPORT_NAMES for value in values):
             raise ValueError("선호 종목은 축구(1), 농구(2), 야구(3), 배구(4) 중 중복 없이 선택해야 합니다.")
         return sorted(values)
+
+    @model_validator(mode="after")
+    def validate_positions(self) -> "RegisterRequest":
+        if set(self.c_position) != set(self.preferred_stocks):
+            raise ValueError("선택한 각 종목의 포지션을 하나씩 입력해야 합니다.")
+        for sport, position in self.c_position.items():
+            if position not in POSITION_OPTIONS[sport]:
+                raise ValueError(f"{SPORT_NAMES[sport]}에 맞는 포지션을 선택해야 합니다.")
+        return self
 
 
 def hash_password(plain_password: str) -> str:
@@ -106,7 +123,7 @@ def register_customer(payload: RegisterRequest) -> dict:
                     payload.c_gender,
                     payload.c_birthday,
                     payload.c_team,
-                    payload.c_position,
+                    payload.c_position[sport],
                     signup_date,
                 )
                 # c_id_seq의 끝 번호는 종목 코드와 같아야 예약 종목을 판별할 수 있습니다.
@@ -145,4 +162,4 @@ def register_customer(payload: RegisterRequest) -> dict:
         if connection is not None:
             connection.close()
 
-# 최종 수정 일 : 2026-10-23
+# 최종 수정 일 : 2026-10-26 / 작업자 : 양태건

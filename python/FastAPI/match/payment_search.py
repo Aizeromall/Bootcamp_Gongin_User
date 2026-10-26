@@ -12,7 +12,7 @@ import pymysql
 from fastapi import APIRouter, HTTPException
 
 from ..database import connect  # 공용 DB 연결 함수 (python/FastAPI/database.py)
-from .reservation_search import format_time  # 시간 값 → "08:00" 형식으로 통일
+from .reservation_search import RESERVATION_MANAGER_JOIN, format_time  # 시간 값 → "08:00" 형식으로 통일
 
 # 이 파일의 API들을 담는 라우터 (__init__.py에서 match_router로 묶임)
 router = APIRouter()
@@ -48,14 +48,16 @@ def payment_to_dict(row: dict) -> dict:
 # p / r / g / m 은 테이블 별칭 (pay / reservation / ground / match_manager)
 # pay.r_seq = reservation.r_seq 로 어떤 예약의 결제인지 찾고,
 # reservation.g_code = ground.g_code 로 구장 이름을 가져옴
-# reservation.m_id = match_manager.m_id 로 예약에 배정된 매니저 이름을 가져옴 (없어도 결제는 나오도록 LEFT JOIN)
-RESERVATION_JOIN = """
+# 매니저는 assign의 경기 요일·시간으로 조회하며 미배정 결제도 표시합니다.
+# 디버그: 없는 reservation.m_id 대신 실제 배정표 조인을 재사용합니다.
+# 작업자 : 양태건 / 최종 수정일 : 2026-10-26
+RESERVATION_JOIN = f"""
     SELECT p.p_seq, p.p_num, p.r_seq, p.c_id_seq, p.p_amount, p.p_date, p.p_method,
-        r.g_code, g.g_name, r.r_date, r.rs_time, r.re_time, r.m_id, m.m_name
+        r.g_code, g.g_name, r.r_date, r.rs_time, r.re_time, m.m_id, m.m_name
     FROM pay AS p
     INNER JOIN reservation AS r ON r.r_seq = p.r_seq
     INNER JOIN ground AS g ON g.g_code = r.g_code
-    LEFT JOIN match_manager AS m ON m.m_id = r.m_id
+    {RESERVATION_MANAGER_JOIN}
 """
 
 
@@ -142,4 +144,4 @@ def select_payment(p_seq: int):
         if connection is not None:
             connection.close()
 
-# 최종 수정 일 : 2026-10-26 수정자 : 신현진
+# 최종 수정 일 : 2026-10-26 / 작업자 : 양태건
