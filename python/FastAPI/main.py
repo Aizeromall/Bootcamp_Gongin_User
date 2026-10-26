@@ -19,14 +19,20 @@ if __package__ in (None, ""):
     from FastAPI.inquiry.inquiry import router as inquiry_router
     from FastAPI.match import match_router
     from FastAPI.cancel import cancel_router                # 수정 : 신현진 2026.10.23
-    from FastAPI.report.report import router as report_router   # 수정 : 김병재 2026.10.26
+    # 중간 수정 작성자 - 신현진
+    # 수정일 2026.10.26
+    # 구장 조회·구장 대여(version2) router (python/FastAPI/ground 폴더)
+    from FastAPI.ground import ground_router
 else:
     # `python -m FastAPI.main` 모듈 실행에서는 일반 상대 import를 사용합니다.
     from .auth import auth_router
     from .inquiry.inquiry import router as inquiry_router
     from .match import match_router
     from .cancel import cancel_router                       # 수정 : 신현진 2026.10.23
-    from .report.report import router as report_router      # 수정 : 김병재 2026.10.26
+    # 중간 수정 작성자 - 신현진
+    # 수정일 2026.10.26
+    # 구장 조회·구장 대여(version2) router (python/FastAPI/ground 폴더)
+    from .ground import ground_router
 
 # main.py → FastAPI → python → 프로젝트 루트 순서로 서버 환경 설정을 읽습니다.
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
@@ -75,8 +81,14 @@ app.include_router(inquiry_router, prefix="/inquiry")
 # 취소 router: 회원 예약 취소 기능을 /cancel 하위 경로로 연결합니다.          # 수정 : 신현진 2026.10.23
 app.include_router(cancel_router, prefix="/cancel")
 
-# 신고 router: 신고 작성·내 신고 내역 기능을 /report 하위 경로로 연결합니다.   # 수정 : 김병재 2026.10.26
-app.include_router(report_router, prefix="/report")
+# 중간 수정 작성자 - 신현진
+# 수정일 2026.10.26
+# 구장 router (version2): 구장 관련 기능을 /ground 하위 경로로 연결합니다.
+#   - 구장 조회 : /ground, /ground/{g_code}  (기존 /match/ground 에서 주소 변경)
+#   - 구장 대여 : /ground/reservation/...    (회원·팀장이 비어 있는 시간대에 구장 전체를 빌림, 담당 매니저 지정)
+# 실력매칭 예약(/match/reservation)과 같은 시간대에 겹치지 않도록 서로 막습니다.
+# /ground 주소는 ground/__init__.py에서 붙이므로 여기서는 prefix 없이 등록합니다.
+app.include_router(ground_router)
 
 
 if __name__ == "__main__":
@@ -90,5 +102,4 @@ if __name__ == "__main__":
         reload=False,
     )
 
-# 최종 수정 일 : 2026-10-26 / 작업자 : 양태건 (취소 API DELETE CORS 허용)
-# 최종 수정 일 : 2026-10-26 / 작업자 : 김병재 (신고 API 라우터 등록)
+# 최종 수정 일 : 2026-10-26 / 작업자 : 양태건 (취소 API DELETE CORS 허용) / 수정자 : 신현진 (ground router 추가)
