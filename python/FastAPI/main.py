@@ -23,6 +23,10 @@ if __package__ in (None, ""):
     # 수정일 2026.10.26
     # 구장 조회·구장 대여(version2) router (python/FastAPI/ground 폴더)
     from FastAPI.ground import ground_router
+    # 중간 수정 작성자 - 신현진
+    # 수정일 2026.10.26
+    # 팀 경기 매칭 router (python/FastAPI/team_match 폴더)
+    from FastAPI.team_match import team_match_router
 else:
     # `python -m FastAPI.main` 모듈 실행에서는 일반 상대 import를 사용합니다.
     from .auth import auth_router
@@ -33,6 +37,10 @@ else:
     # 수정일 2026.10.26
     # 구장 조회·구장 대여(version2) router (python/FastAPI/ground 폴더)
     from .ground import ground_router
+    # 중간 수정 작성자 - 신현진
+    # 수정일 2026.10.26
+    # 팀 경기 매칭 router (python/FastAPI/team_match 폴더)
+    from .team_match import team_match_router
 
 # main.py → FastAPI → python → 프로젝트 루트 순서로 서버 환경 설정을 읽습니다.
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
@@ -90,6 +98,15 @@ app.include_router(cancel_router, prefix="/cancel")
 # /ground 주소는 ground/__init__.py에서 붙이므로 여기서는 prefix 없이 등록합니다.
 app.include_router(ground_router)
 
+# 중간 수정 작성자 - 신현진
+# 수정일 2026.10.26
+# 팀 경기 매칭 router: 팀장끼리 팀 대결을 신청·수락하는 기능을 /team_match 하위 경로로 연결합니다.
+#   - 팀장이 구장대여 후 그 대여 내역으로 [매칭신청] 게시글 작성
+#   - 다른 팀 팀장이 리스트에서 신청 → 게시글에 신청 댓글 ("요청됨")
+#   - 게시글 팀 팀장이 수락 → 대댓글로 수락·성사 기록 + team_match 저장 + 대여 r_check = 1
+# /team_match 주소는 team_match/__init__.py에서 붙이므로 여기서는 prefix 없이 등록합니다.
+app.include_router(team_match_router)
+
 
 if __name__ == "__main__":
     import uvicorn
@@ -102,4 +119,4 @@ if __name__ == "__main__":
         reload=False,
     )
 
-# 최종 수정 일 : 2026-10-26 / 작업자 : 양태건 (취소 API DELETE CORS 허용) / 수정자 : 신현진 (ground router 추가)
+# 최종 수정 일 : 2026-10-26 / 작업자 : 양태건 (취소 API DELETE CORS 허용) / 수정자 : 신현진 (ground router, team_match router 추가)
