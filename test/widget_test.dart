@@ -65,7 +65,10 @@ void main() {
           'c_name': '회원',
           'preferred_stocks': ['3'],
         },
-        '/match/ground' => {'results': []},
+        // 중간 수정 작성자 - 신현진
+        // 수정일 2026.10.26
+        // 구장 조회 주소 변경 (/match/ground → /ground)
+        '/ground' => {'results': []},
         '/inquiry/list' => {'results': []},
         _ => {'results': []},
       };
@@ -91,7 +94,7 @@ void main() {
     expect(find.text('무엇을 도와드릴까요?'), findsOneWidget);
     expect(
       calls,
-      containsAll(['/auth/login', '/match/ground', '/inquiry/list']),
+      containsAll(['/auth/login', '/ground', '/inquiry/list']),
     );
   });
   test('서버 422 세부 오류를 사용자 메시지로 변환', () async {

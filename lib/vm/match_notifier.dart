@@ -6,9 +6,12 @@
 //   VM    : 이 파일. 서버 호출 + 상태(로딩/데이터/에러) 관리
 //   Model : lib/model/ground_model.dart (JSON ↔ Ground 객체 변환)
 //
-// [연결된 서버 API] (python/FastAPI/match/ground_search.py)
-//   GET /match/ground                 전체 구장 목록 (?keyword= 로 구장명/주소 검색)
-//   GET /match/ground/{g_code}        구장 1건 상세
+// 중간 수정 작성자 - 신현진
+// 수정일 2026.10.26
+// [연결된 서버 API] (python/FastAPI/ground/ground_search.py)
+//   GET /ground                 전체 구장 목록 (?keyword= 로 구장명/주소 검색)
+//   GET /ground/{g_code}        구장 1건 상세
+//   (version2에서 /match/ground → /ground 로 주소 변경)
 //
 // [화면에서 사용하는 방법]
 //   1) 목록 화면
@@ -55,8 +58,11 @@ class GroundListNotifier extends AsyncNotifier<List<Ground>> {
   // 서버에서 구장 목록을 받아 Ground 객체 목록으로 변환
   // keyword가 비어 있으면 전체 목록, 있으면 구장명/주소 검색 결과
   Future<List<Ground>> _fetchGrounds(String keyword) async {
+    // 중간 수정 작성자 - 신현진
+    // 수정일 2026.10.26
     // Uri.parse(...).replace(queryParameters:) : 한글 검색어도 주소에 맞게 자동 인코딩
-    final uri = Uri.parse('$baseUrl/match/ground').replace(
+    // 주소 변경 : /match/ground → /ground
+    final uri = Uri.parse('$baseUrl/ground').replace(
       queryParameters: keyword.isEmpty ? null : {'keyword': keyword},
     );
     final response = await http.get(uri);
@@ -108,8 +114,11 @@ final groundListProvider =
 // 상세 화면은 조회만 하고 바꿀 상태가 없어서 Notifier 대신 FutureProvider 사용
 // g_code가 같으면 결과를 재사용하고, 다르면 구장별로 따로 조회
 // 사용 예: ref.watch(groundDetailProvider(ground.g_code))
+// 중간 수정 작성자 - 신현진
+// 수정일 2026.10.26
+// 주소 변경 : /match/ground/{g_code} → /ground/{g_code}
 final groundDetailProvider = FutureProvider.family<Ground, String>((ref, gCode) async {
-  final response = await http.get(Uri.parse('$baseUrl/match/ground/$gCode'));
+  final response = await http.get(Uri.parse('$baseUrl/ground/$gCode'));
 
   // 404 : 존재하지 않는 구장 코드 (서버에서 detail 메시지를 보내줌)
   if (response.statusCode == 404) {
