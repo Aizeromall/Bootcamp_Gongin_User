@@ -52,7 +52,9 @@ class DeleteTeamTests(unittest.TestCase):
         self.assertNotIn('c_id_seq =', calls[3].args[0])
         self.assertIn("c.c_team = '무소속'", calls[4].args[0])
         self.assertEqual(calls[4].args[1], (7, '우리 팀'))
-        self.assertEqual(calls[5].args, ('DELETE FROM t_register WHERE t_id = %s', (7,)))
+        self.assertIn("UPDATE t_register SET c_category = '탈퇴', tr_date = NOW()", calls[5].args[0])
+        self.assertEqual(calls[5].args[1], (7,))
+        self.assertFalse(any('DELETE FROM t_register' in call.args[0] for call in calls))
         self.assertFalse(any('DELETE FROM team ' in call.args[0] or
                              'DELETE FROM team_captain_change' in call.args[0] for call in calls))
         self.connection.commit.assert_called_once()

@@ -52,6 +52,8 @@ from ..match.reservation_search import format_time
 from ..match.reservation_status import RESERVATION_RENTAL, category_condition, reservation_type_condition
 
 # 이 파일의 API들을 담는 라우터 (team_match/__init__.py에서 team_match_router로 묶임)
+# 수정 일 : 2026-10-27 / 작업자 : 양태건
+# 가입 상태는 가입으로 저장하며 기존 가입일 데이터는 조회 호환만 유지합니다.
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -556,7 +558,9 @@ def select_team_match_requests(
                 team = find_captain_team(cursor, comment["c_id_seq"])
                 member_count = 0
                 if team:
-                    cursor.execute("SELECT COUNT(*) AS n FROM t_register WHERE t_id = %s", (team["t_id"],))
+                    # 수정 일 : 2026-10-27 / 작업자 : 양태건
+                    # 팀원 수에서 탈퇴 이력을 제외합니다.
+                    cursor.execute("SELECT COUNT(*) AS n FROM t_register WHERE t_id = %s AND COALESCE(c_category, '') IN ('', '가입', '가입일')", (team["t_id"],))
                     member_count = cursor.fetchone()["n"]
                 requests.append({
                     "comment_seq": comment["comment_seq"],          # 신청 댓글 번호 (수락/거절할 때 사용)

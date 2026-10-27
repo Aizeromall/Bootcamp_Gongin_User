@@ -17,6 +17,8 @@ from fastapi import APIRouter, HTTPException, Path, Query
 
 from ..database import connect
 
+# 수정 일 : 2026-10-27 / 작업자 : 양태건
+# 가입 상태는 가입으로 저장하며 기존 가입일 데이터는 조회 호환만 유지합니다.
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -24,11 +26,13 @@ logger = logging.getLogger(__name__)
 # 수정 일 : 2026-10-27 / 작업자 : 양태건
 # 팀 개설·폐지와 같은 테이블을 사용하며 팀장 변경 기록 중 가장 최근 팀장을 조회합니다.
 # 개설 기록이 없는 기존 팀도 LEFT JOIN으로 목록에서 빠지지 않게 합니다.
+# 수정 일 : 2026-10-27 / 작업자 : 양태건
+# 팀원 수는 가입 또는 기존 빈 상태인 회원만 세며 탈퇴 이력은 제외합니다.
 TEAM_SELECT = """
     SELECT t.t_id, t.t_name, t.t_logo, t.t_rating,
            tc.c_id_seq AS creator_id, tc.c_category, tc.c_date,
            captain.c_id_seq AS captain_id, captain.c_name AS captain_name,
-           (SELECT COUNT(*) FROM t_register tr WHERE tr.t_id = t.t_id) AS member_count
+           (SELECT COUNT(*) FROM t_register tr WHERE tr.t_id = t.t_id AND COALESCE(tr.c_category, '') IN ('', '가입', '가입일')) AS member_count
     FROM team t
     LEFT JOIN team_create tc ON tc.t_id = t.t_id
     LEFT JOIN customer captain ON captain.c_id_seq = COALESCE(
