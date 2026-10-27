@@ -24,6 +24,7 @@ if __package__ in (None, ""):
     from FastAPI.cancel import cancel_router                # 수정 : 신현진 2026.10.23
     from FastAPI.report.report import router as report_router   # 수정 : 김병재 2026.10.26
     from FastAPI.sanction.sanction import router as sanction_router   # 수정 : 김병재 2026.10.27
+    from FastAPI.appeal.appeal import router as appeal_router   # 수정 : 김병재 2026.10.27
     # 중간 수정 작성자 - 신현진
     # 수정일 2026.10.26
     # 구장 조회·구장 대여(version2) router (python/FastAPI/ground 폴더)
@@ -43,6 +44,7 @@ else:
     from .cancel import cancel_router                       # 수정 : 신현진 2026.10.23
     from .report.report import router as report_router      # 수정 : 김병재 2026.10.26
     from .sanction.sanction import router as sanction_router      # 수정 : 김병재 2026.10.27
+    from .appeal.appeal import router as appeal_router      # 수정 : 김병재 2026.10.27
     # 중간 수정 작성자 - 신현진
     # 수정일 2026.10.26
     # 구장 조회·구장 대여(version2) router (python/FastAPI/ground 폴더)
@@ -129,6 +131,9 @@ app.include_router(board_router, prefix="/board", tags=["Board"])
 app.include_router(team_router, prefix="/team", tags=["Team"])
 # 제재 router: 내 제재 내역 조회 기능을 /sanction 하위 경로로 연결합니다.   # 수정 : 김병재 2026.10.27
 app.include_router(sanction_router, prefix="/sanction")
+
+# 이의신청 router: 이의신청 접수·내 이의신청 내역 기능을 /appeal 하위 경로로 연결합니다.   # 수정 : 김병재 2026.10.27
+app.include_router(appeal_router, prefix="/appeal")
 
 
 if __name__ == "__main__":
