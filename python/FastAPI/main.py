@@ -18,7 +18,6 @@ if __package__ in (None, ""):
     from FastAPI.auth import auth_router
     from FastAPI.chat import chat_router
     from FastAPI.team_create.team import router as team_router
-    from FastAPI.team.team import router as team_router
     from FastAPI.announce import announce_router
     from FastAPI.board.board import router as board_router
     from FastAPI.inquiry.inquiry import router as inquiry_router
@@ -40,7 +39,6 @@ else:
     from .auth import auth_router
     from .chat import chat_router
     from .team_create.team import router as team_router
-    from .team.team import router as team_router
     from .announce import announce_router
     from .board.board import router as board_router
     from .inquiry.inquiry import router as inquiry_router
