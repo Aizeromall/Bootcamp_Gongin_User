@@ -5,7 +5,9 @@
 
 from fastapi import APIRouter
 
-from .ground_search import router as ground_search_router
+# 중간 수정 작성자 - 신현진
+# 수정일 2026.10.26
+# 구장 조회(ground_search)는 ground 폴더로 옮겨서 여기서 제외 (ground/__init__.py의 ground_router에서 /ground로 등록)
 from .payment import router as payment_router
 from .payment_search import router as payment_search_router
 from .reservation import router as reservation_router
@@ -17,8 +19,6 @@ match_router = APIRouter()
 match_router.include_router(reservation_router, tags=["Ground Reservation"])
 # 결제: 예약 r_seq에 대해 payment 데이터를 생성합니다.
 match_router.include_router(payment_router, tags=["Ground Payment"])
-# 구장 조회: 구장 목록 / 구장 1건 상세를 조회합니다.
-match_router.include_router(ground_search_router, tags=["Ground Search"])
 # 예약 조회: 회원별 예약 내역 / 구장 시간대 예약 현황 / 예약 1건을 조회합니다.
 match_router.include_router(reservation_search_router, tags=["Reservation Search"])
 # 결제 조회: 회원별 결제 내역 / 예약별 결제 / 결제 1건을 조회합니다.
@@ -26,4 +26,4 @@ match_router.include_router(payment_search_router, tags=["Payment Search"])
 # 경기결과 조회: 회원이 참여한 경기결과 목록 / 결과 1건을 조회합니다.
 match_router.include_router(resultcheck_router, tags=["Result Check"])
 
-# 최종 수정 일 : 2026-10-23
+# 최종 수정 일 : 2026-10-26 수정자 : 신현진 (구장 조회 ground 폴더로 이동)
