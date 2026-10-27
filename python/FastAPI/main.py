@@ -16,6 +16,8 @@ from fastapi.middleware.cors import CORSMiddleware
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from FastAPI.auth import auth_router
+    from FastAPI.chat import chat_router
+    from FastAPI.team_create.team import router as team_router
     from FastAPI.team.team import router as team_router
     from FastAPI.announce import announce_router
     from FastAPI.board.board import router as board_router
@@ -36,6 +38,8 @@ if __package__ in (None, ""):
 else:
     # `python -m FastAPI.main` 모듈 실행에서는 일반 상대 import를 사용합니다.
     from .auth import auth_router
+    from .chat import chat_router
+    from .team_create.team import router as team_router
     from .team.team import router as team_router
     from .announce import announce_router
     from .board.board import router as board_router
@@ -134,6 +138,10 @@ app.include_router(sanction_router, prefix="/sanction")
 
 # 이의신청 router: 이의신청 접수·내 이의신청 내역 기능을 /appeal 하위 경로로 연결합니다.   # 수정 : 김병재 2026.10.27
 app.include_router(appeal_router, prefix="/appeal")
+
+# 수정 일 : 2026-10-27 / 작업자 : 양태건
+# 채팅 인증·방 관리와 WebSocket 실시간 메시지를 연결합니다.
+app.include_router(chat_router)
 
 
 if __name__ == "__main__":

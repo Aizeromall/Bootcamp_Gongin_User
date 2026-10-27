@@ -139,3 +139,77 @@ python3 python/FastAPI/main.py
 탐색 종목은 Riverpod의 `groundSportProvider`, 지역은 `groundRegionProvider`로 관리합니다.
 예약·결제 종목과 탐색 상태를 분리하여 미가입 종목도 조회할 수 있고,
 예약 직전에는 가입 종목을 확인한 뒤 종목별 회원 ID를 연결합니다.
+
+### 개인 채팅방 및 실시간 메시지 (2026-10-27, 양태건)
+
+`python/FastAPI/chat/chat.py`는 기능별 router를 통합하고 `__init__.py`가 이를 main.py에 제공합니다.
+요청 모델과 해당 API는 같은 파일에 정의하며, 파일당 클래스 정의는 최대 하나입니다.
+
+- `chat_login_request.py`: `ChatLoginRequest`와 채팅 토큰 발급 router
+- `create_room_request.py`: `CreateRoomRequest`와 방 생성 router
+- `invite_request.py`: `InviteRequest`와 회원 초대 router
+- `socket_message.py`: `SocketMessage`와 메시지 조회·WebSocket 송수신 router
+- `chat_room.py`: 공통 인증·DB 처리 및 방 조회·나가기·종료 router
+- `chat_request.py`: 공통 요청 설정 클래스 (독립 API 없음)
+- `socket_auth.py`: 첫 WebSocket 인증 프레임 클래스 (인증은 같은 WebSocket 안에서 처리)
+- `connection_manager.py`: 실시간 연결 관리 클래스 (독립 API 없음)
+
+현재 `messenger`, `participate`, `send_message`를 그대로 사용하며 DB 변경은 필요하지 않습니다.
+기본 방 이름은 회원의 `customer.c_team`이고, 무소속이면 `회원이름님의 채팅방`입니다.
+생성자가 최초 참여자로 등록되어 방장이 됩니다. 팀 테이블의 팀장 권한과는 별개입니다.
+
+채팅 추가 패키지 설치:
+
+```bash
+python3 -m pip install -r python/requirements-chat.txt
+```
+
+1. `POST /chat/token`에 종목별 회원 ID(`member_01`)와 `c_pw`를 보내 채팅용 토큰을 받습니다.
+2. Swagger **Authorize** 또는 HTTP `Authorization: Bearer 토큰`에 토큰을 설정합니다.
+3. `POST /chat/rooms`에 `{}`를 보내 기본 이름의 방을 만듭니다. `me_name`으로 다른 이름도 지정할 수 있습니다.
+4. 방장이 `POST /chat/rooms/{me_id}/invite`에 `{"member_ids": ["other_01"]}`를 보내 즉시 초대합니다.
+5. `GET /chat/rooms`, `GET /chat/rooms/{me_id}`로 자신의 방과 참여자를 조회합니다.
+6. WebSocket 클라이언트로 `ws://서버주소:8000/chat/ws/{me_id}`에 연결합니다.
+
+WebSocket 연결 후 10초 안에 아래 인증 프레임을 보냅니다. 토큰은 URL에 넣지 않습니다.
+
+```json
+{"type": "auth", "access_token": "채팅용 토큰"}
+```
+
+서버가 `{"type":"ready", ...}`를 응답한 다음 메시지를 보냅니다.
+
+```json
+{"type": "message", "content": "안녕하세요!"}
+```
+
+메시지는 MySQL 저장·commit에 성공한 뒤 같은 방의 연결된 참여자들에게 전달됩니다.
+응답은 `{"type":"message","message":{...}}`이고,
+메시지 ID(`s_me_id`)·방 ID·발신 회원 ID·이름·내용·전송 시각이 포함됩니다.
+클라이언트가 발신 회원을 지정할 수 없으며 서버는 인증 토큰의 회원 ID를 사용합니다.
+동기 PyMySQL 작업은 WebSocket 이벤트 루프를 막지 않도록 스레드에서 실행합니다.
+Swagger는 일반 HTTP API 테스트용이며 WebSocket은 별도 클라이언트가 필요합니다.
+
+- 최근 메시지: `GET /chat/rooms/{me_id}/messages?limit=50`
+- 과거 메시지: `GET /chat/rooms/{me_id}/messages?before_id=메시지ID`
+- 재접속 후 누락 조회: `GET /chat/rooms/{me_id}/messages?after_id=마지막메시지ID`
+- 페이지당 최대 100건이며, 응답은 오래된 메시지부터 정렬됩니다. 다음 페이지는 받은 메시지 번호로 요청합니다.
+- 내 화면의 중복 표시는 `s_me_id`로 제거할 수 있습니다. 연결 실패 후 같은 내용을 다시 보내면 별도 메시지로 저장될 수 있습니다.
+- 나가기: `DELETE /chat/rooms/{me_id}/leave`. 방장은 나갈 수 없고 최초 참여 기록이 유지됩니다.
+- 방 종료: 방장만 `DELETE /chat/rooms/{me_id}`. 상태를 `종료`로 바꾸고 대화·참여 기록은 보존합니다.
+- 나가기/종료 후 송신은 즉시 차단하며, 기존 연결은 후속 메시지 또는 최대 30초 주기 검사에서 종료됩니다.
+- 초대·재초대된 참여자는 이전 대화 전체를 조회할 수 있습니다. 현재 스키마에는 가입 시각·이력 제한 정보가 없습니다.
+- `s_me_confirm`은 기본값 0으로 보존하며 개인별 읽음 여부·안 읽은 인원 수는 제공하지 않습니다.
+- 채팅은 `c_id_seq`별로 참여하므로 같은 회원이라도 `member_01`과 `member_03`은 서로 다른 참여 ID입니다.
+
+토큰은 30분 후 만료됩니다. 기존 `/auth/login` API는 변경하지 않고 채팅 토큰을 따로 발급합니다.
+서버 환경변수 `CHAT_TOKEN_SECRET`에 충분히 긴 비밀키(32바이트 이상 권장)를 지정할 수 있습니다.
+지정하지 않으면 프로세스 시작마다 임시 키가 생성되므로 재시작하면 기존 토큰으로 접속할 수 없습니다.
+실시간 연결은 **단일 서버 프로세스/worker** 기준입니다. 여러 worker로 확장하려면 Redis 등의 공유 방송 계층이 필요합니다.
+앱 채팅 화면은 이번 Backend 구현에 포함하지 않습니다.
+
+테스트는 실제 채팅방·참여자·메시지를 생성하지 않고 모의 DB와 WebSocket TestClient로 검증합니다.
+
+```bash
+python3 -m unittest discover -s python/tests -p test_chat.py -v
+```

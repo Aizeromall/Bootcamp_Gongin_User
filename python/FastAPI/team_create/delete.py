@@ -15,6 +15,8 @@ from fastapi import APIRouter, HTTPException, Path, Query
 
 from ..database import connect
 
+# 수정 일 : 2026-10-27 / 작업자 : 양태건
+# 가입 상태는 가입으로 저장하며 기존 가입일 데이터는 조회 호환만 유지합니다.
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -80,12 +82,15 @@ def delete_team(
             # 이 팀 가입 회원만 처리합니다. 다른 팀명으로 이미 갱신된 회원 소속은 덮어쓰지 않습니다.
             cursor.execute(
                 """UPDATE customer c INNER JOIN t_register tr ON tr.c_id_seq = c.c_id_seq
-                   SET c.c_team = '무소속' WHERE tr.t_id = %s AND c.c_team = %s""",
+                   SET c.c_team = '무소속' WHERE tr.t_id = %s AND c.c_team = %s AND COALESCE(tr.c_category, '') IN ('', '가입', '가입일')""",
                 (t_id, team["t_name"]),
             )
 
-            # 가입을 해제하여 폐지된 팀원도 새 팀에 가입하거나 팀을 개설할 수 있게 합니다.
-            cursor.execute("DELETE FROM t_register WHERE t_id = %s", (t_id,))
+            # 가입 이력은 보존하고 현재 팀원만 폐지 처리 시각의 탈퇴 상태로 바꿉니다.
+            cursor.execute(
+                """UPDATE t_register SET c_category = '탈퇴', tr_date = NOW()
+                   WHERE t_id = %s AND COALESCE(c_category, '') IN ('', '가입', '가입일')""", (t_id,),
+            )
             members_released = cursor.rowcount
 
             # 응답은 실제 저장된 폐지 시각을 사용합니다. team과 팀장 이력은 삭제하지 않습니다.
