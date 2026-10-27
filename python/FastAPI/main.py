@@ -17,10 +17,13 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from FastAPI.auth import auth_router
     from FastAPI.team.team import router as team_router
+    from FastAPI.announce import announce_router
     from FastAPI.board.board import router as board_router
     from FastAPI.inquiry.inquiry import router as inquiry_router
     from FastAPI.match import match_router
     from FastAPI.cancel import cancel_router                # 수정 : 신현진 2026.10.23
+    from FastAPI.report.report import router as report_router   # 수정 : 김병재 2026.10.26
+    from FastAPI.sanction.sanction import router as sanction_router   # 수정 : 김병재 2026.10.27
     # 중간 수정 작성자 - 신현진
     # 수정일 2026.10.26
     # 구장 조회·구장 대여(version2) router (python/FastAPI/ground 폴더)
@@ -33,10 +36,13 @@ else:
     # `python -m FastAPI.main` 모듈 실행에서는 일반 상대 import를 사용합니다.
     from .auth import auth_router
     from .team.team import router as team_router
+    from .announce import announce_router
     from .board.board import router as board_router
     from .inquiry.inquiry import router as inquiry_router
     from .match import match_router
     from .cancel import cancel_router                       # 수정 : 신현진 2026.10.23
+    from .report.report import router as report_router      # 수정 : 김병재 2026.10.26
+    from .sanction.sanction import router as sanction_router      # 수정 : 김병재 2026.10.27
     # 중간 수정 작성자 - 신현진
     # 수정일 2026.10.26
     # 구장 조회·구장 대여(version2) router (python/FastAPI/ground 폴더)
@@ -84,6 +90,8 @@ def health() -> dict[str, str]:
 
 # 인증 router: 회원가입·로그인 기능을 /auth 하위 경로로 연결합니다.
 app.include_router(auth_router, prefix="/auth")
+# 공지 router: 사용자 대상 공지의 분류·목록·상세만 읽기 전용으로 제공합니다.
+app.include_router(announce_router, prefix="/announce", tags=["User Announcement"])
 # 구장 예약 router: 종목별 회원 ID와 구장 코드를 reservation 테이블에 연결합니다.
 app.include_router(match_router, prefix="/match", tags=["Ground Reservation"])
 
@@ -119,6 +127,8 @@ app.include_router(board_router, prefix="/board", tags=["Board"])
 # 수정 일 : 2026-10-27 / 작업자 : 양태건
 # 팀 개설·최초 팀장 등록 API를 /team 하위에 연결합니다.
 app.include_router(team_router, prefix="/team", tags=["Team"])
+# 제재 router: 내 제재 내역 조회 기능을 /sanction 하위 경로로 연결합니다.   # 수정 : 김병재 2026.10.27
+app.include_router(sanction_router, prefix="/sanction")
 
 
 if __name__ == "__main__":
@@ -134,3 +144,8 @@ if __name__ == "__main__":
 
 # 수정 일 : 2026-10-26 / 수정자 : 신현진 (ground router, team_match router 추가)
 # 최종 수정 일 : 2026-10-27 / 작업자 : 양태건
+# 최종 수정 일 : 2026-10-26 / 작업자 : 양태건 (취소 API DELETE CORS 허용)
+# 최종 수정 일 : 2026-10-26 / 작업자 : 김병재 (신고 API 라우터 등록)
+# 최종 수정 일 : 2026-10-27 / 작업자 : 김병재 (제재 API 라우터 등록)
+# 이전 수정 일 : 2026-10-26 / 작업자 : 양태건 (취소 API DELETE CORS 허용) / 수정자 : 신현진 (ground router, team_match router 추가)
+# 최종 수정 일 : 2026-10-27 / 수정자 : 최현준 (공지·게시판 router 동시 유지 및 main 충돌 해결)
