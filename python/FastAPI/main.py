@@ -17,6 +17,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from FastAPI.auth import auth_router
     from FastAPI.announce import announce_router
+    from FastAPI.board.board import router as board_router
     from FastAPI.inquiry.inquiry import router as inquiry_router
     from FastAPI.match import match_router
     from FastAPI.cancel import cancel_router                # 수정 : 신현진 2026.10.23
@@ -32,6 +33,7 @@ else:
     # `python -m FastAPI.main` 모듈 실행에서는 일반 상대 import를 사용합니다.
     from .auth import auth_router
     from .announce import announce_router
+    from .board.board import router as board_router
     from .inquiry.inquiry import router as inquiry_router
     from .match import match_router
     from .cancel import cancel_router                       # 수정 : 신현진 2026.10.23
@@ -68,7 +70,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins or ["*"],
     allow_credentials=False,
-    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
 
@@ -112,6 +114,11 @@ app.include_router(ground_router)
 app.include_router(team_match_router)
 
 
+# 수정 일 : 2026-10-26 / 작업자 : 양태건
+# 게시글·댓글 router를 연결하여 Swagger와 앱에서 /board 경로로 사용합니다.
+app.include_router(board_router, prefix="/board", tags=["Board"])
+
+
 if __name__ == "__main__":
     import uvicorn
 
@@ -124,4 +131,4 @@ if __name__ == "__main__":
     )
 
 # 이전 수정 일 : 2026-10-26 / 작업자 : 양태건 (취소 API DELETE CORS 허용) / 수정자 : 신현진 (ground router, team_match router 추가)
-# 최종 수정 일 : 2026-10-27 / 수정자 : 최현준 (사용자 공지 router 추가)
+# 최종 수정 일 : 2026-10-27 / 수정자 : 최현준 (공지·게시판 router 동시 유지 및 main 충돌 해결)
