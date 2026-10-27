@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from FastAPI.auth import auth_router
+    from FastAPI.chat import chat_router
     from FastAPI.team_create.team import router as team_router
     from FastAPI.board.board import router as board_router
     from FastAPI.inquiry.inquiry import router as inquiry_router
@@ -32,6 +33,7 @@ if __package__ in (None, ""):
 else:
     # `python -m FastAPI.main` 모듈 실행에서는 일반 상대 import를 사용합니다.
     from .auth import auth_router
+    from .chat import chat_router
     from .team_create.team import router as team_router
     from .board.board import router as board_router
     from .inquiry.inquiry import router as inquiry_router
@@ -119,6 +121,10 @@ app.include_router(board_router, prefix="/board", tags=["Board"])
 # 수정 일 : 2026-10-27 / 작업자 : 양태건
 # 팀 개설·최초 팀장 등록 API를 /team 하위에 연결합니다.
 app.include_router(team_router, prefix="/team", tags=["Team"])
+
+# 수정 일 : 2026-10-27 / 작업자 : 양태건
+# 채팅 인증·방 관리와 WebSocket 실시간 메시지를 연결합니다.
+app.include_router(chat_router)
 
 
 if __name__ == "__main__":

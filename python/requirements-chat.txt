@@ -1,0 +1,4 @@
+# 채팅 추가 의존성 / 2026-10-27 / 작업자 : 양태건
+# 기존 FastAPI·uvicorn·PyMySQL·python-dotenv 환경에 추가 설치합니다.
+PyJWT>=2.10,<3
+websockets
