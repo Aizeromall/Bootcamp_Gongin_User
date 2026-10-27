@@ -20,6 +20,7 @@ if __package__ in (None, ""):
     from FastAPI.match import match_router
     from FastAPI.cancel import cancel_router                # 수정 : 신현진 2026.10.23
     from FastAPI.report.report import router as report_router   # 수정 : 김병재 2026.10.26
+    from FastAPI.sanction.sanction import router as sanction_router   # 수정 : 김병재 2026.10.27
 else:
     # `python -m FastAPI.main` 모듈 실행에서는 일반 상대 import를 사용합니다.
     from .auth import auth_router
@@ -27,6 +28,7 @@ else:
     from .match import match_router
     from .cancel import cancel_router                       # 수정 : 신현진 2026.10.23
     from .report.report import router as report_router      # 수정 : 김병재 2026.10.26
+    from .sanction.sanction import router as sanction_router      # 수정 : 김병재 2026.10.27
 
 # main.py → FastAPI → python → 프로젝트 루트 순서로 서버 환경 설정을 읽습니다.
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
@@ -78,6 +80,9 @@ app.include_router(cancel_router, prefix="/cancel")
 # 신고 router: 신고 작성·내 신고 내역 기능을 /report 하위 경로로 연결합니다.   # 수정 : 김병재 2026.10.26
 app.include_router(report_router, prefix="/report")
 
+# 제재 router: 내 제재 내역 조회 기능을 /sanction 하위 경로로 연결합니다.   # 수정 : 김병재 2026.10.27
+app.include_router(sanction_router, prefix="/sanction")
+
 
 if __name__ == "__main__":
     import uvicorn
@@ -92,3 +97,4 @@ if __name__ == "__main__":
 
 # 최종 수정 일 : 2026-10-26 / 작업자 : 양태건 (취소 API DELETE CORS 허용)
 # 최종 수정 일 : 2026-10-26 / 작업자 : 김병재 (신고 API 라우터 등록)
+# 최종 수정 일 : 2026-10-27 / 작업자 : 김병재 (제재 API 라우터 등록)
