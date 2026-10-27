@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from FastAPI.auth import auth_router
+    from FastAPI.team.team import router as team_router
     from FastAPI.announce import announce_router
     from FastAPI.board.board import router as board_router
     from FastAPI.inquiry.inquiry import router as inquiry_router
@@ -34,6 +35,7 @@ if __package__ in (None, ""):
 else:
     # `python -m FastAPI.main` 모듈 실행에서는 일반 상대 import를 사용합니다.
     from .auth import auth_router
+    from .team.team import router as team_router
     from .announce import announce_router
     from .board.board import router as board_router
     from .inquiry.inquiry import router as inquiry_router
@@ -122,6 +124,9 @@ app.include_router(team_match_router)
 # 게시글·댓글 router를 연결하여 Swagger와 앱에서 /board 경로로 사용합니다.
 app.include_router(board_router, prefix="/board", tags=["Board"])
 
+# 수정 일 : 2026-10-27 / 작업자 : 양태건
+# 팀 개설·최초 팀장 등록 API를 /team 하위에 연결합니다.
+app.include_router(team_router, prefix="/team", tags=["Team"])
 # 제재 router: 내 제재 내역 조회 기능을 /sanction 하위 경로로 연결합니다.   # 수정 : 김병재 2026.10.27
 app.include_router(sanction_router, prefix="/sanction")
 
@@ -137,6 +142,8 @@ if __name__ == "__main__":
         reload=False,
     )
 
+# 수정 일 : 2026-10-26 / 수정자 : 신현진 (ground router, team_match router 추가)
+# 최종 수정 일 : 2026-10-27 / 작업자 : 양태건
 # 최종 수정 일 : 2026-10-26 / 작업자 : 양태건 (취소 API DELETE CORS 허용)
 # 최종 수정 일 : 2026-10-26 / 작업자 : 김병재 (신고 API 라우터 등록)
 # 최종 수정 일 : 2026-10-27 / 작업자 : 김병재 (제재 API 라우터 등록)

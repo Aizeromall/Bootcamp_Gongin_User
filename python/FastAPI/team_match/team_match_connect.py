@@ -84,6 +84,8 @@ STATUS_REJECTED = "rejected"    # 거절됨 (다시 신청 가능)
 
 # 회원이 팀장인 팀 찾기 (t_rating : 팀 Elo 점수, 화면의 팀 레벨 표시용)
 # 팀장 = team_captain_change의 가장 최근 팀장, 변경 기록이 없으면 team_create의 생성자
+# 수정 일 : 2026-10-27 / 작업자 : 양태건
+# 개설·팀장 이력은 보존하되 폐지된 팀은 팀 매칭 권한 조회에서 제외합니다.
 CAPTAIN_TEAM_SQL = """
     SELECT t.t_id, t.t_name, t.t_logo, t.t_rating
     FROM team AS t
@@ -95,6 +97,7 @@ CAPTAIN_TEAM_SQL = """
             LIMIT 1),
         tc.c_id_seq
     ) = %s
+        AND COALESCE(tc.c_category, '') <> '폐지일'
     ORDER BY t.t_id
     LIMIT 1
 """
@@ -710,4 +713,4 @@ def reject_team_match_request(
 ):
     return answer_team_match_request(c_id_seq, bulletin_seq, comment_seq, False)
 
-# 최종 수정 일 : 2026-10-26
+# 최종 수정 일 : 2026-10-27 / 작업자 : 양태건
