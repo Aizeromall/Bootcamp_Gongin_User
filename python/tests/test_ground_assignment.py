@@ -6,7 +6,11 @@ from unittest.mock import MagicMock, patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from python.FastAPI.match import ground_search, reservation
+# 중간 수정 작성자 - 신현진
+# 수정일 2026.10.26
+# 구장 조회(ground_search)가 ground 폴더로 이동해서 import 경로 변경
+from python.FastAPI.ground import ground_search
+from python.FastAPI.match import reservation
 
 
 class GroundAssignmentTests(unittest.TestCase):
@@ -18,18 +22,21 @@ class GroundAssignmentTests(unittest.TestCase):
         cursor = connection.cursor.return_value.__enter__.return_value
         cursor.fetchall.return_value = [row]
         cursor.fetchone.return_value = row
+        # 중간 수정 작성자 - 신현진
+        # 수정일 2026.10.26
+        # 구장 조회 주소가 /match/ground → /ground 로 바뀌어 prefix와 요청 주소 변경
         app = FastAPI()
-        app.include_router(ground_search.router, prefix="/match")
+        app.include_router(ground_search.router, prefix="/ground")
         with patch.object(ground_search, "connect", return_value=connection), TestClient(app) as client:
-            for path, params in [("/match/ground", {}), ("/match/ground", {"keyword": "서울"}),
-                                 ("/match/ground/1", {})]:
+            for path, params in [("/ground", {}), ("/ground", {"keyword": "서울"}),
+                                 ("/ground/1", {})]:
                 with self.subTest(path=path, params=params):
                     response = client.get(path, params=params)
                     self.assertEqual(response.status_code, 200)
                     data = response.json()
                     self.assertIsNone((data['results'][0] if 'results' in data else data)['m_id'])
             cursor.fetchone.return_value = None
-            self.assertEqual(client.get('/match/ground/999').status_code, 404)
+            self.assertEqual(client.get('/ground/999').status_code, 404)
         self.assertEqual(connection.close.call_count, 4)
         connection.commit.assert_not_called()
 
@@ -38,9 +45,12 @@ class GroundAssignmentTests(unittest.TestCase):
             with self.subTest(manager=manager):
                 connection = MagicMock()
                 cursor = connection.cursor.return_value.__enter__.return_value
+                # 중간 수정 작성자 - 신현진
+                # 수정일 2026.10.26
+                # 순서: 구장 → 회원 → 배정 매니저 → 중복 예약(None) → 구장 대여 확인(None, version2 추가) → 예약 수
                 cursor.fetchone.side_effect = [
                     {'g_code': 1, 'g_num': 10}, {'1': 1}, manager,
-                    None, {'reservation_count': 0},
+                    None, None, {'reservation_count': 0},
                 ]
                 cursor.lastrowid = 99
                 with patch.object(reservation, 'connect', return_value=connection):

@@ -1,11 +1,14 @@
 # 작업자 : 신현진
 # 최초 작업 일 : 2026-10-23
 
-# 구장 조회 API (match_router에 묶여 실제 주소 앞에 /match 가 붙음)
-#   GET /match/ground                  전체 구장 목록 (?keyword= 로 구장명/주소 검색 가능)
-#   GET /match/ground/{g_code}         구장 1건 상세
+# 중간 수정 작성자 - 신현진
+# 수정일 2026.10.26
+# 구장 조회 API (ground_router에 묶여 실제 주소 앞에 /ground 가 붙음)
+#   GET /ground                  전체 구장 목록 (?keyword= 로 구장명/주소 검색 가능)
+#   GET /ground/{g_code}         구장 1건 상세
 # 조회만 하고 받는 값(body)이 없어서 BaseModel class 없음
 # 구장 응답에 오늘 기준 배정 경기매니저(m_id, m_name)를 함께 보냄 (assign 테이블, 2026.10.26 추가)
+# version2 : match 폴더 → ground 폴더로 이동, 주소도 /match/ground → /ground 로 변경 (2026.10.26)
 import logging
 from datetime import date
 from typing import Optional
@@ -15,9 +18,13 @@ from fastapi import APIRouter, HTTPException
 
 from ..database import connect  # 공용 DB 연결 함수 (python/FastAPI/database.py)
 
-# 이 파일의 API들을 담는 라우터 (__init__.py에서 match_router로 묶임)
-from .reservation import ASSIGN_DAY_CONDITION
+# 중간 수정 작성자 - 신현진
+# 수정일 2026.10.26
+# 배정 요일 조건은 실력매칭 예약(match/reservation.py)과 같은 기준을 사용
+# ground 폴더로 옮겨서 같은 폴더(.)가 아닌 match 폴더(..match)에서 가져옴
+from ..match.reservation import ASSIGN_DAY_CONDITION
 
+# 이 파일의 API들을 담는 라우터 (ground/__init__.py에서 ground_router로 묶임)
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -62,10 +69,13 @@ GROUND_SELECT = f"""
 """
 
 
+# 중간 수정 작성자 - 신현진
+# 수정일 2026.10.26
 # 전체 구장 목록 조회
 # keyword가 있으면 구장명 또는 주소에 keyword가 들어간 구장만 조회
-# 예: /match/ground?keyword=강남
-@router.get("/ground")
+# 예: /ground?keyword=강남
+# ground_router 앞에 /ground가 붙으므로 여기 주소는 "" (빈 문자열) → 실제 주소 /ground
+@router.get("")
 def select_grounds(keyword: Optional[str] = None):
     connection = None
     try:
@@ -98,9 +108,13 @@ def select_grounds(keyword: Optional[str] = None):
             connection.close()  # 성공/실패 상관없이 DB 연결 종료
 
 
+# 중간 수정 작성자 - 신현진
+# 수정일 2026.10.26
 # 구장 1건 상세 조회
-# 주의: "/ground" 보다 아래에 있어야 하며, 주소의 g_code로 구장 1곳만 조회
-@router.get("/ground/{g_code}")
+# 주의: 목록("") 보다 아래에 있어야 하며, 주소의 g_code로 구장 1곳만 조회
+# 실제 주소 /ground/{g_code}
+# (구장 대여 /ground/reservation/... 주소는 ground/__init__.py에서 이 라우터보다 먼저 등록해서 겹치지 않게 함)
+@router.get("/{g_code}")
 def select_ground(g_code: str):
     connection = None
     try:
@@ -128,4 +142,4 @@ def select_ground(g_code: str):
         if connection is not None:
             connection.close()
 
-# 최종 수정 일 : 2026-10-26 / 작업자 : 양태건
+# 최종 수정 일 : 2026-10-26 / 작업자 : 양태건 / 수정자 : 신현진 (ground 폴더 이동, /ground 주소 변경)

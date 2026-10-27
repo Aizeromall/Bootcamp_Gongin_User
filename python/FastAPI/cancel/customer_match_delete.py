@@ -11,7 +11,7 @@ from datetime import date
 import pymysql
 from fastapi import APIRouter, HTTPException, Query
 
-from ..match.reservation_status import CANCEL_REASONS, category_condition, is_canceled
+from ..match.reservation_status import CANCEL_REASONS, RESERVATION_RENTAL, category_condition, is_canceled
 from ..database import connect  # 공용 DB 연결 함수 (python/FastAPI/database.py)
 
 # 이 파일의 API들을 담는 라우터 (__init__.py에서 cancel_router로 묶임)
@@ -46,8 +46,9 @@ def delete_customer_reservation(
             # 수정일 2026.10.26
             # 1) 취소할 예약 조회
             # FOR UPDATE : 취소하는 동안 다른 요청이 이 예약을 바꾸지 못하게 잠금
+            # reservation_category : 구장대여(2)는 이 API로 취소하지 않도록 구분값도 함께 조회 (2026.10.26 신현진)
             sql = """
-                SELECT r_seq, c_id_seq, g_code, r_date, r_check, r_category, r_c_category
+                SELECT r_seq, c_id_seq, g_code, r_date, r_check, reservation_category, r_category, r_c_category
                 FROM reservation
                 WHERE r_seq = %s
                 FOR UPDATE
@@ -56,6 +57,17 @@ def delete_customer_reservation(
             reservation = cursor.fetchone()  # 1건만 받음 (없으면 None)
             if reservation is None:
                 raise HTTPException(status_code=404, detail="존재하지 않는 예약 번호입니다.")
+
+            # 중간 수정 작성자 - 신현진
+            # 수정일 2026.10.26
+            # 1-1) 구장대여(reservation_category = 2)는 구장대여 취소 API에서만 취소
+            # (실력매칭 취소 규칙 r_check 등과 섞이지 않게 분리)
+            # 값이 없으면 DB 기본값과 같은 1(실력매칭)로 봄
+            if reservation.get("reservation_category", 1) == RESERVATION_RENTAL:
+                raise HTTPException(
+                    status_code=409,
+                    detail="구장대여 예약은 /ground/reservation/{r_seq} 에서 취소해 주세요.",
+                )
 
             # 2) 본인 예약인지 확인
             if reservation["c_id_seq"] != c_id_seq:
@@ -125,4 +137,4 @@ def delete_customer_reservation(
         if connection is not None:
             connection.close()  # 성공/실패 상관없이 DB 연결 종료
 
-# 최종 수정 일 : 2026-10-26 / 작업자 : 양태건
+# 최종 수정 일 : 2026-10-26 / 작업자 : 양태건 / 수정자 : 신현진 (구장대여 예약 취소 분리)

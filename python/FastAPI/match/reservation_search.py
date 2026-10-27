@@ -24,7 +24,15 @@ import pymysql
 from fastapi import APIRouter, HTTPException, Query
 
 from ..database import connect  # 공용 DB 연결 함수 (python/FastAPI/database.py)
-from .reservation_status import category_condition, is_canceled, cancel_reason
+# 예약 구분(reservation_category) 1 실력매칭 / 2 구장대여 조건을 함께 사용 (2026.10.26 신현진)
+from .reservation_status import (
+    RESERVATION_MATCH,
+    RESERVATION_RENTAL,
+    cancel_reason,
+    category_condition,
+    is_canceled,
+    reservation_type_condition,
+)
 from .reservation import ASSIGN_DAY_CONDITION, TIME_SLOTS  # 예약 시간대 목록 (08:00~22:00, 2시간 단위)
 
 # 이 파일의 API들을 담는 라우터 (__init__.py에서 match_router로 묶임)
@@ -62,6 +70,8 @@ def reservation_to_dict(row: dict) -> dict:
         "m_id": row["m_id"],                     # 배정 경기매니저 ID (배정이 없으면 None)
         "m_name": row["m_name"],                 # 경기매니저 이름 (match_manager JOIN)
         "r_date": row["r_date"],                 # 경기일 (예약한 날짜, 취소해도 그대로 유지)
+        # 예약 구분 (1 실력매칭 / 2 구장대여) - 값이 없으면 DB 기본값과 같은 1(실력매칭)  # 2026.10.26 신현진
+        "reservation_category": row.get("reservation_category", RESERVATION_MATCH),
         "r_category": CATEGORY_CANCELED if is_canceled(row) else CATEGORY_RESERVED,         # 카테고리 (1 예약 / 2 취소)
         "is_canceled": is_canceled(row),  # 취소 여부 (앱에서 true/false로 바로 사용)
         "r_c_category": row["r_c_category"],
@@ -93,9 +103,10 @@ RESERVATION_MANAGER_JOIN = f"""
         ORDER BY a.assign_seq DESC LIMIT 1
     )
 """
+# reservation_category : 예약 구분 (1 실력매칭 / 2 구장대여) 컬럼 추가 (2026.10.26 신현진)
 RESERVATION_SELECT = f"""
     SELECT r.r_seq, r.c_id_seq, r.g_code, g.g_name, g.g_address, m.m_id, m.m_name,
-        r.r_date, r.rs_time, r.re_time, r.r_check, r.r_category, r.r_c_category, p.p_seq
+        r.r_date, r.rs_time, r.re_time, r.r_check, r.reservation_category, r.r_category, r.r_c_category, p.p_seq
     FROM reservation AS r
     INNER JOIN ground AS g ON g.g_code = r.g_code
     {RESERVATION_MANAGER_JOIN}
@@ -120,8 +131,12 @@ def select_reservations_by_customer(
         connection = connect()  # DB 연결
         with connection.cursor() as cursor:  # SQL을 실행할 커서 (with가 끝나면 자동으로 닫힘)
             # 취소 시각 컬럼이 없으므로 경기일·예약번호 기준으로 정렬합니다.
+            # 중간 수정 작성자 - 신현진
+            # 수정일 2026.10.26
+            # reservation_category = 1 : 실력매칭 내역만 조회 (구장대여 내역은 /ground/reservation/customer/... 에서 조회)
             sql = RESERVATION_SELECT + f"""
                 WHERE r.c_id_seq = %s AND {category_condition(r_category == CATEGORY_CANCELED, 'r')}
+                    AND {reservation_type_condition(RESERVATION_MATCH, 'r')}
                 ORDER BY r.r_date DESC, r.rs_time DESC, r.r_seq DESC
             """
             cursor.execute(sql, (c_id_seq,))
@@ -159,28 +174,47 @@ def select_reservation_status(g_code: str, r_date: date):
             # 2) 해당 날짜의 시간대별 예약 수
             # GROUP BY rs_time : 같은 시작 시간끼리 묶어서 COUNT(*)로 개수를 셈
             # 취소 사유가 있는 예약은 정원에서 제외하고 기존 빈 상태 예약도 포함
+            # reservation_category = 1 : 실력매칭 예약만 정원으로 셈
             sql = f"""
                 SELECT rs_time, COUNT(*) AS reservation_count
                 FROM reservation
-                WHERE g_code = %s AND r_date = %s AND {category_condition(False)}
+                WHERE g_code = %s AND r_date = %s
+                    AND {category_condition(False)} AND {reservation_type_condition(RESERVATION_MATCH)}
                 GROUP BY rs_time
             """
             cursor.execute(sql, (g_code, r_date))
             rows = cursor.fetchall()
 
+            # 중간 수정 작성자 - 신현진
+            # 수정일 2026.10.26
+            # 3) 구장대여(reservation_category = 2)로 빌려진 시간대 (취소 사유가 없는 대여만)
+            # 대여된 시간대는 실력매칭 예약을 받을 수 없으므로 마감으로 표시
+            cursor.execute(
+                f"""SELECT rs_time FROM reservation
+                    WHERE g_code = %s AND r_date = %s
+                        AND {category_condition(False)} AND {reservation_type_condition(RESERVATION_RENTAL)}""",
+                (g_code, r_date),
+            )
+            rented_times = {format_time(row["rs_time"]) for row in cursor.fetchall()}
+
+        # 중간 수정 작성자 - 신현진
+        # 수정일 2026.10.26
         # {시작시간: 예약 수} 형태로 정리 (예약이 없는 시간대는 dict에 없음)
         counts = {format_time(row["rs_time"]): row["reservation_count"] for row in rows}
         capacity = ground["g_num"]  # 수용인원
         # TIME_SLOTS 전체를 돌면서 예약 없는 시간대도 0건으로 채워서 보냄
+        # 구장 대여된 시간대는 남은 자리 0 / 마감(true)으로 보냄
         slots = []
         for rs_time, re_time in TIME_SLOTS.items():
             count = counts.get(rs_time, 0)
+            is_rented = rs_time in rented_times
             slots.append({
                 "rs_time": rs_time,                              # 시작 시간
                 "re_time": re_time,                              # 종료 시간
                 "reservation_count": count,                      # 현재 예약 수
-                "remaining_capacity": max(capacity - count, 0),  # 남은 자리
-                "is_full": count >= capacity,                    # 마감 여부
+                "remaining_capacity": 0 if is_rented else max(capacity - count, 0),  # 남은 자리
+                "is_full": is_rented or count >= capacity,       # 마감 여부
+                "is_rented": is_rented,                          # 구장 대여로 마감된 시간대
             })
         return {
             "g_code": ground["g_code"],
@@ -229,4 +263,4 @@ def select_reservation(r_seq: int):
         if connection is not None:
             connection.close()
 
-# 최종 수정 일 : 2026-10-26 / 작업자 : 양태건
+# 최종 수정 일 : 2026-10-26 / 작업자 : 양태건 / 수정자 : 신현진 (구장 대여 시간대 마감 표시)
