@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from FastAPI.auth import auth_router
-    from FastAPI.team.team import router as team_router
+    from FastAPI.team_create.team import router as team_router
     from FastAPI.board.board import router as board_router
     from FastAPI.inquiry.inquiry import router as inquiry_router
     from FastAPI.match import match_router
@@ -32,7 +32,7 @@ if __package__ in (None, ""):
 else:
     # `python -m FastAPI.main` 모듈 실행에서는 일반 상대 import를 사용합니다.
     from .auth import auth_router
-    from .team.team import router as team_router
+    from .team_create.team import router as team_router
     from .board.board import router as board_router
     from .inquiry.inquiry import router as inquiry_router
     from .match import match_router

@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, patch
 import pymysql
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from python.FastAPI.team import apply_team
-from python.FastAPI.team.team import router
+from python.FastAPI.team_create import apply_team
+from python.FastAPI.team_create.team import router
 
 
 class ApplyTeamTests(unittest.TestCase):

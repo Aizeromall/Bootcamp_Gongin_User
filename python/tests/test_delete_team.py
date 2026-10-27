@@ -10,8 +10,8 @@ import pymysql
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from python.FastAPI.team import delete
-from python.FastAPI.team.team import router
+from python.FastAPI.team_create import delete
+from python.FastAPI.team_create.team import router
 
 
 class DeleteTeamTests(unittest.TestCase):
