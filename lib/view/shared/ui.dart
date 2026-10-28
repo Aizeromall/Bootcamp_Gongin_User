@@ -2,6 +2,8 @@
 // 최초 작업 일 : 2026-10-24
 import 'package:flutter/material.dart';
 
+import 'member_style.dart';
+
 void showMessage(BuildContext context, Object message) =>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -12,7 +14,7 @@ String day(DateTime value) => value.toIso8601String().split('T').first;
 Widget pageContent(List<Widget> children) => Center(
   child: ConstrainedBox(
     constraints: const BoxConstraints(maxWidth: 900),
-    child: ListView(padding: const EdgeInsets.all(24), children: children),
+    child: ListView(padding: const EdgeInsets.all(20), children: children),
   ),
 );
 Widget heading(String title, String subtitle) => Padding(
@@ -23,18 +25,21 @@ Widget heading(String title, String subtitle) => Padding(
       Text(
         title,
         style: const TextStyle(
-          fontSize: 28,
+          fontSize: 24,
           fontWeight: FontWeight.w800,
-          color: Color(0xFF193B2B),
+          color: MemberStyle.ink,
         ),
       ),
       const SizedBox(height: 8),
-      Text(subtitle, style: const TextStyle(color: Color(0xFF647568))),
+      Text(subtitle, style: const TextStyle(color: MemberStyle.muted)),
     ],
   ),
 );
 
 /// 비동기 조회 공통 상태: 로딩·빈 목록·오류·재시도를 일관되게 표시합니다.
+// 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 전체 회원 목업의 화면 흐름과 공통 스타일을 적용합니다.
+
 class ResultList extends StatelessWidget {
   const ResultList({
     super.key,
@@ -78,4 +83,4 @@ class ResultList extends StatelessWidget {
     },
   );
 }
-// 최종 수정 일 : 2026-10-24
+// 최종 수정 일 : 2026-10-28 / 작업자 : 양태건

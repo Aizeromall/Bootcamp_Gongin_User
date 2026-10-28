@@ -51,6 +51,8 @@ dependencies:
   geolocator: ^14.1.1
   # Table calender
   table_calendar: ^3.3.0
+  # 수정 일 : 2026-10-27 / 작업자 : 양태건 (채팅 실시간 통신)
+  web_socket_channel: ^3.0.3
 
 dev_dependencies:
   flutter_test:
