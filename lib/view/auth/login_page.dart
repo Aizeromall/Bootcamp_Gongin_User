@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../vm/member_state.dart';
 import '../shared/ui.dart';
+import '../shared/member_components.dart';
+import '../shared/member_style.dart';
 import 'register_page.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
@@ -74,20 +76,18 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(
-                    Icons.sports_soccer,
-                    size: 64,
-                    color: Color(0xFF298653),
+                  // 수정 일 : 2026-10-28 / 작업자 : 양태건
+                  // 아이디 로그인 API가 제공하는 실제 흐름만 표시합니다.
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: MemberBrand(),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 12),
                   const Text(
-                    '공IN 중개사',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900),
+                    '다시 만나 반가워요. 오늘은 어떤 경기를 뛸까요?',
+                    style: TextStyle(fontSize: 12, color: MemberStyle.muted),
                   ),
-                  const SizedBox(height: 8),
-                  const Text('함께 뛰는 오늘, 더 즐거운 경기', textAlign: TextAlign.center),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 28),
                   TextFormField(
                     controller: id,
                     decoration: const InputDecoration(
@@ -138,4 +138,4 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     ),
   );
 }
-// 최종 수정 일 : 2026-10-24
+// 최종 수정 일 : 2026-10-28 / 작업자 : 양태건

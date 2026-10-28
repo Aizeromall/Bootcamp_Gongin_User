@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../vm/member_state.dart';
 import '../shared/ui.dart';
+import '../shared/member_components.dart';
+import '../shared/member_style.dart';
 
 class PaymentPage extends ConsumerStatefulWidget {
   const PaymentPage({
@@ -12,10 +14,12 @@ class PaymentPage extends ConsumerStatefulWidget {
     required this.rSeq,
     required this.memberId,
     required this.groundName,
+    this.expectedAmount,
   });
   final int rSeq;
   final String memberId;
   final String groundName;
+  final int? expectedAmount;
   @override
   ConsumerState<PaymentPage> createState() => _PaymentPageState();
 }
@@ -29,9 +33,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('결제 기록을 저장할까요?'),
-        content: const Text(
-          'Version 1은 결제 내역을 저장합니다. 실제 카드·간편결제 승인 및 출금은 진행되지 않습니다.',
-        ),
+        content: const Text('결제 내역만 저장합니다. 실제 카드·간편결제 승인 및 출금은 진행되지 않습니다.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -73,49 +75,152 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
     }
   }
 
+  // 수정 일 : 2026-10-28 / 작업자 : 양태건
+  // 목업의 결제 수단 카드·금액 요약을 적용하며 실제 PG 승인으로 표시하지 않습니다.
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('예약 결제')),
+    bottomNavigationBar: SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: FilledButton(
+          onPressed: busy
+              ? null
+              : receipt == null
+              ? pay
+              : () => Navigator.pop(context, true),
+          child: Text(
+            busy
+                ? '저장 중…'
+                : receipt == null
+                ? '결제 기록 저장'
+                : '완료',
+          ),
+        ),
+      ),
+    ),
     body: pageContent([
-      heading(
-        receipt == null ? '결제 수단을 선택해 주세요' : '결제 기록이 저장되었어요',
-        '${widget.groundName} · 예약 #${widget.rSeq}',
+      MemberPanel(
+        color: Colors.white,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.groundName,
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '예약 #${widget.rSeq}',
+              style: const TextStyle(color: MemberStyle.muted),
+            ),
+          ],
+        ),
       ),
       if (receipt == null) ...[
         const Text(
-          '실제 결제 승인은 제공되지 않습니다. 금액은 구장 이용료 ÷ 수용 인원을 원 단위로 반올림해 서버에서 확정합니다.',
+          '결제 수단',
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
         ),
-        const SizedBox(height: 24),
-        DropdownButtonFormField<String>(
-          initialValue: method,
-          decoration: const InputDecoration(labelText: '결제 수단'),
-          items: [
-            '카드 결제',
-            '카카오페이',
-            '네이버페이',
-            '토스 페이',
-            '휴대폰 결제',
-            '애플 페이',
-          ].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
-          onChanged: busy ? null : (v) => setState(() => method = v!),
+        const SizedBox(height: 16),
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          childAspectRatio: 2.8,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          children: [
+            for (final entry in {
+              '카드 결제': Icons.credit_card,
+              '카카오페이': Icons.chat_bubble_outline,
+              '네이버페이': Icons.payment,
+              '토스 페이': Icons.account_balance_wallet_outlined,
+              '휴대폰 결제': Icons.phone_android,
+              '애플 페이': Icons.phone_iphone,
+            }.entries)
+              Material(
+                color: method == entry.key
+                    ? const Color(0xFFEAF1FF)
+                    : Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(
+                    color: method == entry.key
+                        ? MemberStyle.blue
+                        : MemberStyle.line,
+                  ),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: busy ? null : () => setState(() => method = entry.key),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Row(
+                      children: [
+                        Icon(entry.value, size: 21, color: MemberStyle.blue),
+                        const SizedBox(width: 7),
+                        Expanded(
+                          child: Text(
+                            entry.key,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
-        const SizedBox(height: 24),
-        FilledButton(
-          onPressed: busy ? null : pay,
-          child: Text(busy ? '저장 중…' : '결제 기록 저장'),
+        const SizedBox(height: 26),
+        MemberPanel(
+          child: Column(
+            children: [
+              MemberInfoRow('선택 수단', method),
+              MemberInfoRow(
+                '예상 금액',
+                widget.expectedAmount == null
+                    ? '저장 후 확정 금액 확인'
+                    : '${widget.expectedAmount}원',
+              ),
+              const Divider(),
+              const Text(
+                '실제 승인·출금 없이 결제 내역만 저장됩니다. 최종 금액은 서버의 저장 결과를 확인해 주세요.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: MemberStyle.muted,
+                  height: 1.7,
+                ),
+              ),
+            ],
+          ),
         ),
       ] else ...[
-        const Icon(Icons.check_circle, color: Color(0xFF298653), size: 72),
-        Text(
-          '결제번호 ${receipt!['p_num']}\n금액 ${receipt!['p_amount']}원\n${receipt!['p_method']}\n예약일 ${receipt!['p_date']}',
-          style: const TextStyle(fontSize: 20, height: 1.8),
+        const Icon(Icons.check_circle, size: 64, color: MemberStyle.blue),
+        const SizedBox(height: 16),
+        const Text(
+          '결제 기록이 저장되었어요',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
         ),
-        FilledButton(
-          onPressed: () => Navigator.pop(context, true),
-          child: const Text('완료'),
+        const SizedBox(height: 22),
+        MemberPanel(
+          child: Column(
+            children: [
+              MemberInfoRow('결제번호', receipt!['p_num']),
+              MemberInfoRow('금액', '${receipt!['p_amount']}원'),
+              MemberInfoRow('결제 수단', receipt!['p_method']),
+              MemberInfoRow('저장일', receipt!['p_date']),
+            ],
+          ),
         ),
       ],
     ]),
   );
 }
-// 최종 수정 일 : 2026-10-24
+// 최종 수정 일 : 2026-10-28 / 작업자 : 양태건

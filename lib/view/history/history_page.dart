@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../vm/member_state.dart';
+import '../../vm/history_state.dart';
 import '../payment/payment_page.dart';
 import '../shared/ui.dart';
+import 'reservation_detail_page.dart';
 
 class HistoryPage extends ConsumerStatefulWidget {
   const HistoryPage({super.key});
@@ -17,33 +19,12 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
   String kind = 'reservation';
   bool cancelBusy = false;
   String? memberId;
-  late Future<Map<String, dynamic>> future;
-  void load() {
-    // 디버그: 종목별 회원 ID와 예약번호로 결제를 연결하고 취소는 별도 조회합니다.
-    // 작업자 : 양태건 / 최종 수정일 : 2026-10-26
-    final api = ref.read(memberApiProvider);
-    final id = Uri.encodeComponent(memberId!);
-    final canceled = kind == 'cancel';
-    future = () async {
-      final responses = await Future.wait([
-        api.request(
-          '/match/reservation/customer/$id',
-          query: {'r_category': canceled ? '2' : '1'},
-        ),
-        if (!canceled) api.request('/match/payment/customer/$id'),
-      ]);
-      if (canceled) return responses.first;
-      final payments = {
-        for (final row in responses[1]['results'] as List) row['r_seq']: row,
-      };
-      return {
-        'results': [
-          for (final row in responses.first['results'] as List)
-            <String, dynamic>{...row, ...?payments[row['r_seq']]},
-        ],
-      };
-    }();
-  }
+  // 수정 일 : 2026-10-28 / 작업자 : 양태건
+  ({String id, bool canceled}) get historyKey =>
+      (id: memberId!, canceled: kind == 'cancel');
+  Future<Map<String, dynamic>> get future =>
+      ref.watch(historyProvider(historyKey).future);
+  void load() => ref.invalidate(historyProvider(historyKey));
 
   // 디버그: 기존 페이지의 대화상자에서 직접 작성한 사유를 전송합니다.
   // 작업자 : 양태건 / 최종 수정일 : 2026-10-26
@@ -122,7 +103,6 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
     final id = ref.watch(memberIdProvider);
     if (id != memberId) {
       memberId = id;
-      load();
     }
     return pageContent([
       heading(
@@ -162,6 +142,24 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
                   style: const TextStyle(
                     fontSize: 21,
                     fontWeight: FontWeight.bold,
+                  ),
+                ),
+                // 수정 일 : 2026-10-28 / 작업자 : 양태건
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) =>
+                              ReservationDetailPage(seq: row['r_seq'] as int),
+                        ),
+                      );
+                      if (mounted) setState(load);
+                    },
+                    icon: const Icon(Icons.confirmation_number_outlined),
+                    label: const Text('예약 상세'),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -222,4 +220,4 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
     ]);
   }
 }
-// 최종 수정 일 : 2026-10-26 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-28 / 작업자 : 양태건

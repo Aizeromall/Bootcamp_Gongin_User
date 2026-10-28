@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../vm/member_state.dart';
+import '../../vm/member_features.dart';
 import '../shared/ui.dart';
 
 class InquiryPage extends ConsumerStatefulWidget {
@@ -17,12 +18,11 @@ class _InquiryPageState extends ConsumerState<InquiryPage> {
   int option = 2;
   bool busy = false;
   String? memberId;
-  late Future<Map<String, dynamic>> future;
-  void load() {
-    future = ref
-        .read(memberApiProvider)
-        .request('/inquiry/list', query: {'c_id_seq': memberId!});
-  }
+  // 수정 일 : 2026-10-28 / 작업자 : 양태건
+  ApiQuery get query => apiQuery('/inquiry/list', {'c_id_seq': memberId!});
+  Future<Map<String, dynamic>> get future =>
+      ref.watch(apiDocumentProvider(query).future);
+  void load() => ref.invalidate(apiDocumentProvider(query));
 
   @override
   void dispose() {
@@ -224,7 +224,6 @@ class _InquiryPageState extends ConsumerState<InquiryPage> {
     final id = ref.watch(memberIdProvider);
     if (id != memberId) {
       memberId = id;
-      load();
     }
     return pageContent([
       heading('무엇을 도와드릴까요?', '남겨주신 문의와 답변을 이곳에서 확인하세요.'),
@@ -282,4 +281,4 @@ class _InquiryPageState extends ConsumerState<InquiryPage> {
     ]);
   }
 }
-// 최종 수정 일 : 2026-10-26 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-28 / 작업자 : 양태건

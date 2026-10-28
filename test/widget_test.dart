@@ -82,6 +82,8 @@ void main() {
         child: const MyApp(),
       ),
     );
+    await tester.tap(find.text('시작하기'));
+    await tester.pumpAndSettle();
     expect(find.text('로그인'), findsOneWidget);
     await tester.enterText(find.byType(TextFormField).at(0), 'member');
     await tester.enterText(find.byType(TextFormField).at(1), 'password123');
@@ -89,13 +91,15 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('오늘은 어디서 뛸까요?'), findsOneWidget);
     expect(find.text('야구'), findsOneWidget);
-    await tester.tap(find.text('문의'));
+    // 수정 일 : 2026-10-27 / 작업자 : 양태건
+    // 문의는 MY 탭에서 확인합니다.
+    await tester.tap(find.text('MY'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('1:1 문의'), 180);
+    await tester.tap(find.text('1:1 문의'));
     await tester.pumpAndSettle();
     expect(find.text('무엇을 도와드릴까요?'), findsOneWidget);
-    expect(
-      calls,
-      containsAll(['/auth/login', '/ground', '/inquiry/list']),
-    );
+    expect(calls, containsAll(['/auth/login', '/ground', '/inquiry/list']));
   });
   test('서버 422 세부 오류를 사용자 메시지로 변환', () async {
     final api = MemberApi(
@@ -149,9 +153,21 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    // 수정 일 : 2026-10-28 / 작업자 : 양태건
+    // 1단계 계정 정보를 검증한 뒤 2단계 기본 정보·종목 선택으로 이동합니다.
+    for (final entry in {
+      'c_id': 'member',
+      'c_pw': 'password123',
+      'confirmPassword': 'password123',
+      'c_phone': '01012345678',
+    }.entries) {
+      await tester.enterText(find.byKey(ValueKey(entry.key)), entry.value);
+    }
+    await tester.tap(find.text('다음'));
+    await tester.pumpAndSettle();
     expect(find.text('선호 종목: 선택 없음'), findsOneWidget);
     expect(find.text('무소속'), findsOneWidget);
-    expect(find.byType(TextFormField), findsNWidgets(5));
+    expect(find.byType(TextFormField), findsNWidgets(2));
     final options = {
       '축구': ['FW', 'MF', 'DF', 'GK'],
       '농구': ['센터', '가드', '포워드'],
@@ -178,10 +194,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('GK').last);
     await tester.pumpAndSettle();
-    final values = ['member', 'password123', '회원', '서울', '01012345678'];
-    for (var i = 0; i < values.length; i++) {
-      await tester.enterText(find.byType(TextFormField).at(i), values[i]);
-    }
+    await tester.enterText(find.byKey(const ValueKey('c_name')), '회원');
+    await tester.enterText(find.byKey(const ValueKey('c_address')), '서울');
     await tester.tap(find.text('생년월일 선택'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('OK'));
@@ -290,6 +304,8 @@ void main() {
         child: const MaterialApp(home: Scaffold(body: GroundsPage())),
       ),
     );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('구장 검색'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), '서울');
     await tester.testTextInput.receiveAction(TextInputAction.done);
@@ -589,3 +605,5 @@ void main() {
   });
 }
 // 최종 수정 일 : 2026-10-26 / 작업자 : 양태건
+
+// 최종 수정 일 : 2026-10-27 / 작업자 : 양태건
