@@ -86,6 +86,35 @@ class RegisterTests(unittest.TestCase):
         self.connection.commit.assert_not_called()
         self.connection.close.assert_called_once()
 
+    # 수정 일 : 2026-10-28 / 작업자 : 최현준 (실제 DB VARCHAR 길이 경계 회귀 검증)
+    def test_db_length_boundaries_are_accepted(self):
+        self.payload.update(c_phone="1" * 20, c_gender="성" * 10, c_team="팀" * 50)
+        response = self.client.post("/auth/register", json=self.payload)
+        self.assertEqual(response.status_code, 201, response.text)
+        rows = self.cursor.executemany.call_args.args[1]
+        self.assertTrue(all(len(row[5]) == 20 and len(row[6]) == 10 and len(row[8]) == 50 for row in rows))
+
+    def test_db_length_overflow_rejected_before_connection(self):
+        for field, maximum in [("c_phone", 20), ("c_gender", 10), ("c_team", 50)]:
+            with self.subTest(field=field):
+                payload = {**self.payload, field: "가" * (maximum + 1)}
+                response = self.client.post("/auth/register", json=payload)
+                self.assertEqual(response.status_code, 422)
+                self.assertIn(["body", field], [error["loc"] for error in response.json()["detail"]])
+        self.connect.assert_not_called()
+
+    def test_main_exposes_report_and_preserves_existing_routes(self):
+        from python.FastAPI.main import app
+        with TestClient(app) as client:
+            spec = client.get("/openapi.json").json()
+            for path in ["/report/insert", "/report/list", "/auth/register", "/auth/login",
+                         "/notifications/events", "/chat/rooms", "/ground"]:
+                self.assertIn(path, spec["paths"])
+            self.assertEqual(client.post("/report/insert", json={}).status_code, 422)
+            self.assertEqual(client.get("/report/list").status_code, 422)
+
 
 if __name__ == "__main__":
     unittest.main()
+
+# 최종 수정 일 : 2026-10-28 / 작업자 : 최현준

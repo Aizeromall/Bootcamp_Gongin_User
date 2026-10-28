@@ -7,6 +7,10 @@ from fastapi import APIRouter
 
 from .login import router as login_router
 from .register import router as register_router
+from .google import router as google_router
+from .kakao import router as kakao_router
+from .naver import router as naver_router
+from .social_account import router as social_register_router
 
 # main.py의 prefix="/auth"와 결합해 /auth/register, /auth/login 경로를 생성합니다.
 auth_router = APIRouter()
@@ -14,5 +18,10 @@ auth_router = APIRouter()
 auth_router.include_router(register_router, tags=["Auth Register"])
 # 로그인: c_id_seq, c_pw로 회원을 인증하고 선호 종목을 반환합니다.
 auth_router.include_router(login_router, tags=["Auth Login"])
+# 공급자별 인증 → 기존 회원 JWT 또는 신규 가입 티켓 → 추가 정보 입력 순서입니다.
+auth_router.include_router(google_router)
+auth_router.include_router(kakao_router)
+auth_router.include_router(naver_router)
+auth_router.include_router(social_register_router, tags=["Auth Social Register"])
 
-# 최종 수정 일 : 2026-10-23
+# 최종 수정 일 : 2026-10-28 / 작업자 : 최현준

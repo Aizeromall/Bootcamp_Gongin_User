@@ -1,0 +1,7 @@
+{
+  "API_BASE_URL": "http://10.0.2.2:8000",
+  "KAKAO_NATIVE_APP_KEY": "",
+  "NAVER_CLIENT_ID": "",
+  "NAVER_CLIENT_SECRET": "",
+  "NAVER_URL_SCHEME": "gongin-naver"
+}

@@ -34,10 +34,18 @@ class RegisterRequest(BaseModel):
     c_pw: SecretStr = Field(min_length=8, max_length=128)
     c_name: str = Field(min_length=1, max_length=45)
     c_address: str = Field(min_length=1, max_length=255)
-    c_phone: str = Field(min_length=1, max_length=30)
-    c_gender: str = Field(min_length=1, max_length=20)
+    # ************************
+    # 버그 확인 일 : 2026-10-28 / 작업자 : 최현준
+    # 1. 버그 발생 위치 : RegisterRequest의 전화번호·성별·팀명 길이 검증
+    # 2. 버그 내용 : 요청 제한 30/20/100자가 DB VARCHAR(20)/(10)/(50)을 초과
+    # 3. 디버깅 내용 : 실제 DB 길이 20/10/50자로 요청 최대 길이를 일치
+    # 4. 테스트 사항 : 각 필드 최대 길이 허용·1자 초과 422·DB 연결 전 차단 검증
+    # 5. 결과 및 추후 보완 사항 : DB 구조·데이터는 변경하지 않음, schema 변경 시 검증도 함께 확인
+    # ************************
+    c_phone: str = Field(min_length=1, max_length=20)
+    c_gender: str = Field(min_length=1, max_length=10)
     c_birthday: date
-    c_team: str = Field(min_length=1, max_length=100)
+    c_team: str = Field(min_length=1, max_length=50)
     # 디버그: 요청은 종목번호별 포지션으로 받고 DB 각 행에는 해당 값만 저장합니다.
     # 작업자 : 양태건 / 최종 수정일 : 2026-10-26
     c_position: dict[int, str] = Field(min_length=1, max_length=4)
@@ -96,6 +104,9 @@ def hash_password(plain_password: str) -> str:
 def register_customer(payload: RegisterRequest) -> dict:
     """선택한 종목마다 customer 레코드 하나를 원자적으로 생성합니다."""
 
+    # 소셜 회원용 PK 영역은 일반 가입자가 선점할 수 없습니다. 대소문자 무시 DB도 고려합니다.
+    if payload.c_id.lower().startswith(("g_", "k_", "n_", "google_", "kakao_", "naver_")):
+        raise HTTPException(status_code=422, detail="간편로그인용으로 예약된 아이디 접두어는 사용할 수 없습니다.")
     connection = None
     try:
         connection = connect()
@@ -163,3 +174,5 @@ def register_customer(payload: RegisterRequest) -> dict:
             connection.close()
 
 # 최종 수정 일 : 2026-10-26 / 작업자 : 양태건
+# 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (간편로그인 ID 영역 보호)
+# 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (회원가입 입력 길이 DB 기준 적용)

@@ -14,6 +14,7 @@ from starlette.concurrency import run_in_threadpool
 from .chat_room import chat_connection, current_member, decode_chat_token, require_room
 from .socket_auth import SocketAuth
 from .connection_manager import ConnectionManager
+from ..notification.events import enqueue_message
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -96,6 +97,8 @@ def store_message(me_id: int, member_id: str, content: str) -> tuple[dict, set[s
                    WHERE p.me_id = %s AND c.c_deletdate IS NULL""", (me_id,),
             )
             participants = {row["c_id_seq"] for row in cursor.fetchall()}
+            # 메시지와 알림 이벤트가 같은 트랜잭션으로 저장됩니다. 전송 자체는 worker가 수행합니다.
+            enqueue_message(cursor, message_id, member_id, participants)
     return message, participants
 
 # 수정 일 : 2026-10-27 / 작업자 : 양태건
@@ -172,3 +175,4 @@ async def chat_socket(websocket: WebSocket, me_id: int = Path(gt=0)):
         manager.disconnect(me_id, websocket)
 
 # 최종 수정 일 : 2026-10-27 / 작업자 : 양태건
+# 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (메시지 수신자 알림 outbox 연결)
