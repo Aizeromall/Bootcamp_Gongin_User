@@ -11,7 +11,7 @@ VS Code의 `공IN 회원앱 (로컬 설정)`은 실행 전에 동기화하며, �
 
 ## GitHub 공유 시 제외하는 로컬 설정
 
-실제 `.env`, `config/social.local.json`, `ios/Flutter/Social.local.xcconfig`, `Signing.local.xcconfig`, 서비스 계정 JSON, `google-services.json`, `GoogleService-Info.plist`, `lib/firebase_options.dart`는 업로드하지 않습니다. 새 환경은 `.env.example`과 `config/social.example.json`, `ios/Flutter/Social.example.xcconfig`를 참고하고, Firebase 콘솔/FlutterFire 설정으로 본인 프로젝트의 플랫폼 설정 파일과 `firebase_options.dart`를 생성해야 합니다. 생성 전에는 Firebase import 때문에 새 체크아웃의 Flutter 빌드가 실패할 수 있습니다. 비밀값을 소스나 PR 본문에 붙이지 마세요. 공유 정책 정리: 2026-10-28.
+실제 `.env`, `config/social.local.json`, `ios/Flutter/Social.local.xcconfig`, `Signing.local.xcconfig`, 서비스 계정 JSON, `google-services.json`, `GoogleService-Info.plist`는 업로드하지 않습니다. `lib/firebase_options.dart`는 서버 비밀키가 아닌 Firebase 클라이언트 설정이며 필수 import이므로 저장소에 공유합니다. 새 환경은 `.env.example`과 `config/social.example.json`을 참고해 로컬 설정을 준비하고 플랫폼별 Firebase 설정 파일은 별도로 받아야 합니다. 특히 iOS Google 로그인은 로그인용 ID가 포함된 plist가 필요합니다. 이 수정은 Dart 파일 누락을 해결하며 모든 플랫폼의 네이티브 빌드·로그인 성공을 보장하지 않습니다. 비밀값을 소스나 PR 본문에 붙이지 마세요. 공유 정책 수정: 2026-10-29 / 작업자: 최현준.
 
 IDE 기본 실행 설정(2026-10-28 / 양태건): 실행 구성 `공IN 회원앱 (로컬 설정)`은 `config/social.local.json`을 자동으로 읽습니다. 기기를 선택해 F5로 실행하세요. 해당 파일은 Git 제외 대상이며 다른 개발자는 `config/social.example.json`을 참고해 본인 서버 주소·모바일 SDK 키로 작성해야 합니다. 일반 `flutter run` 명령에는 여전히 `--dart-define-from-file=config/social.local.json` 옵션이 필요합니다. FastAPI는 앱과 별도 서버이며 이미 실행 중인 서버를 중복 시작하지 않습니다. 모바일 키·iOS 콜백 설정이 누락되면 간편 로그인은 안내 후 차단됩니다. 서버 `.env` 전체나 서버 비밀키를 앱으로 복사하지 마세요.
 

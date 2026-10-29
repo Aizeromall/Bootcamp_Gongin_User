@@ -399,6 +399,6 @@ ios/Flutter/Signing.local.xcconfig
 
 # 실제 Firebase SDK 설정과 서비스 계정은 각 개발 환경에서 별도 생성합니다.
 ios/Runner/GoogleService-Info.plist
-lib/firebase_options.dart
+# Firebase 클라이언트 설정은 공유합니다. 서버 서비스 계정은 계속 제외합니다.
 **/service-account*.json
 **/*firebase-adminsdk*.json
