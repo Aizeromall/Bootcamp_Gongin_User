@@ -6,7 +6,7 @@
 #   POST   /ground/reservation                                         구장 시간대 대여 (회원·팀장이 구장 전체를 빌림)
 #   GET    /ground/reservation/customer/{c_id_seq}                     회원별 대여 내역 (?r_category=2 취소 내역)
 #   GET    /ground/reservation/{r_seq}                                 대여 1건 상세
-#   DELETE /ground/reservation/{r_seq}?c_id_seq=회원ID&r_c_category=사유  대여 취소 (취소 사유 직접 작성)
+#   DELETE /ground/reservation/{r_seq}?c_id_seq=회원ID&r_c_category=사유  대여 취소 (기타 : 사유 글 직접 작성)
 #
 # [version1 실력매칭(match/reservation.py)과 다른 점]
 #   실력매칭 : 회원 1명이 자리 1개를 예약 → 같은 시간대에 수용인원(g_num)까지 여러 명이 모여 매치 성사
@@ -16,7 +16,8 @@
 # [저장 위치] ERD의 reservation(예약하다) 테이블을 실력매칭과 함께 사용
 #   reservation_category : 1 = 실력매칭 / 2 = 구장대여 → 이 파일은 2만 다룸
 #   r_category / r_c_category : 기존과 같은 예약·취소 규칙 (match/reservation_status.py)
-#     - 구장대여 취소 사유(r_c_category)는 팀장이 직접 작성 (예: "팀매칭 성사 안 됨")
+#     - 회원(팀장)이 직접 취소하면 기타 → 작성한 사유 글을 r_c_category에 저장 (2026.10.28 신현진)
+#       ('1' ~ '3'은 매니저 취소 사유라 회원은 쓸 수 없음)
 #   r_check : 0으로 저장 (팀매칭 성사 여부, 성사 전에는 0)
 #   담당 매니저 : reservation에 매니저 컬럼이 없으므로 assign 배정표의 요일·시간으로 조회
 #   대여 금액 : 저장하지 않고 ground.g_price(시간대 1개 전체 금액)로 계산
@@ -37,7 +38,10 @@ from ..match.reservation import TIME_SLOTS, find_assigned_manager, sport_from_cu
 #   RESERVATION_MANAGER_JOIN : 예약 행마다 배정표 기준 매니저를 붙이는 JOIN
 from ..match.reservation_search import RESERVATION_MANAGER_JOIN, format_time
 #   예약·취소 상태 / 예약 구분(1 실력매칭 / 2 구장대여) 공용 처리
+#   CANCEL_REASONS / RESERVED_CANCEL_CODES : 취소 사유 이름, 회원이 쓸 수 없는 사유 값 (2026.10.28 신현진)
 from ..match.reservation_status import (
+    CANCEL_REASONS,
+    RESERVED_CANCEL_CODES,
     RESERVATION_MATCH,
     RESERVATION_RENTAL,
     cancel_reason,
@@ -71,10 +75,10 @@ def ground_reservation_to_dict(row: dict) -> dict:
         "r_date": row["r_date"],                     # 대여일 (경기일, 취소해도 그대로 유지)
         "rs_time": format_time(row["rs_time"]),      # 대여 시작 시간
         "re_time": format_time(row["re_time"]),      # 대여 종료 시간
-        "reservation_category": row["reservation_category"],  # 예약 구분 (2 구장대여)
+        "reservation_category": row["reservation_category"],  # 예약 구분 (1.픽업매치, 2.구장대여)
         "r_category": CATEGORY_CANCELED if is_canceled(row) else CATEGORY_RESERVED,  # 1 예약 / 2 취소
         "is_canceled": is_canceled(row),             # 취소 여부 (앱에서 true/false로 바로 사용)
-        "r_c_category": row["r_c_category"],         # 취소 사유 원문 (팀장이 직접 작성)
+        "r_c_category": row["r_c_category"],         # 취소 사유 (회원 취소는 작성한 글, 매니저 취소는 '1' ~ '3')
         "cancel_reason": cancel_reason(row),         # 취소 사유 표시 (예약 상태면 None)
         "r_check": bool(row["r_check"]),             # 팀매칭 성사 여부 (DB 0/1 → false/true)
         "p_seq": row["p_seq"],                       # 결제번호 (결제 전이거나 취소로 환불되면 None)
@@ -343,20 +347,30 @@ def select_ground_reservation(r_seq: int):
 #   3) 이미 취소된 대여는 다시 취소 불가
 #   4) 팀매칭이 성사된(r_check = 1) 대여는 취소 불가
 #   5) 이미 지난 날짜의 대여는 취소 불가
-# 취소 사유(r_c_category)는 팀장이 직접 작성 (예: "팀매칭 성사 안 됨", 최대 50자)
 # 결제가 되어 있으면 결제 내역(pay)도 같이 삭제 (환불 처리)
-# 행은 지우지 않고 r_category = "2", r_c_category = 사유로 UPDATE → 같은 시간대가 다시 비어서 대여·실력매칭 가능
+# 행은 지우지 않고 r_category = "2"로 UPDATE → 같은 시간대가 다시 비어서 대여·실력매칭 가능
+#
+# 중간 수정 작성자 - 신현진
+# 수정일 2026.10.28
+# 회원 직접 취소 = 기타 → 팀장이 작성한 사유 글을 r_c_category에 그대로 저장
+#   '1' ~ '3'은 매니저 취소 사유(본사 앱 버튼)라 회원은 고를 수 없고,
+#   글로 '1' ~ '3', '0'만 입력하면 매니저 취소·예약 상태로 잘못 보이므로 422로 막음
+# 팀장이 바뀌어 대여가 새 팀장에게 넘어간 경우에도 결제(pay.c_id_seq)는 실제로 결제한 회원 그대로라
+# 환불 대상은 응답의 refund_c_id_seq(결제한 회원)로 안내
 # 예: DELETE /ground/reservation/15?c_id_seq=hong_01&r_c_category=팀매칭 성사 안 됨
 @router.delete("/reservation/{r_seq}")
 def cancel_ground_reservation(
     r_seq: int,
-    r_c_category: str = Query(min_length=1, max_length=50, description="팀장이 작성한 취소 사유 (최대 50자)"),
+    r_c_category: str = Query(min_length=1, max_length=50, description="팀장이 작성한 취소 사유 (기타, 최대 50자)"),
     c_id_seq: str = Query(min_length=4, max_length=50, description="취소를 요청한 회원 (본인 확인용)"),
 ):
     c_id_seq = c_id_seq.strip()            # 앞뒤 공백 제거
-    r_c_category = r_c_category.strip()    # 공백만 입력한 사유는 막음
+    # 사유 글 검사 : 빈 글 / 매니저 취소 코드('1' ~ '3')·예약 상태('0')와 같은 글 → 422
+    r_c_category = r_c_category.strip()
     if not r_c_category:
         raise HTTPException(status_code=422, detail="취소 사유를 입력해 주세요.")
+    if r_c_category in RESERVED_CANCEL_CODES:
+        raise HTTPException(status_code=422, detail="취소 사유는 숫자 하나가 아닌 글로 입력해 주세요.")
     connection = None
     try:
         connection = connect()
@@ -390,13 +404,19 @@ def cancel_ground_reservation(
             if reservation["r_date"] < date.today():
                 raise HTTPException(status_code=409, detail="이미 지난 대여는 취소할 수 없습니다.")
 
+            # 중간 수정 작성자 - 신현진
+            # 수정일 2026.10.28
             # 6) 결제 내역 삭제 (결제 전 대여면 지울 게 없어서 rowcount = 0)
-            cursor.execute("SELECT p_seq, p_amount FROM pay WHERE r_seq = %s", (r_seq,))
-            payment = cursor.fetchone()  # 환불 금액 안내용 (없으면 None)
+            # pay.c_id_seq : 실제로 결제한 회원 (팀장이 바뀌었으면 이전 팀장) → 환불 대상 안내용
+            cursor.execute("SELECT p_seq, p_amount, c_id_seq FROM pay WHERE r_seq = %s", (r_seq,))
+            payment = cursor.fetchone()  # 환불 금액·대상 안내용 (없으면 None)
             cursor.execute("DELETE FROM pay WHERE r_seq = %s", (r_seq,))
 
+            # 중간 수정 작성자 - 신현진
+            # 수정일 2026.10.28
             # 7) 취소 상태로 변경 (DELETE 대신 UPDATE → 취소 내역으로 남음)
             # category_condition(False) : 그 사이에 다른 요청이 먼저 취소했으면 바뀌지 않음
+            # 회원 직접 취소(기타)이므로 r_c_category = 팀장이 작성한 사유 글
             cursor.execute(
                 f"""UPDATE reservation
                     SET r_category = %s, r_c_category = %s
@@ -406,6 +426,9 @@ def cancel_ground_reservation(
             # rowcount: 바뀐 행 수 → 0이면 그 사이에 이미 취소된 대여
             if cursor.rowcount == 0:
                 raise HTTPException(status_code=409, detail="이미 취소된 대여입니다.")
+        # 중간 수정 작성자 - 신현진
+        # 수정일 2026.10.28
+        # 응답 : 저장한 사유 글, 환불 대상(결제한 회원) 추가
         connection.commit()  # 결제 삭제 + 취소 상태 변경을 한 번에 확정
         return {
             "result": "OK",
@@ -414,9 +437,11 @@ def cancel_ground_reservation(
             "reservation_category": RESERVATION_RENTAL,              # 예약 구분 (2 구장대여)
             "r_category": CATEGORY_CANCELED,                         # 변경된 카테고리 (2 취소)
             "r_date": reservation["r_date"],                         # 취소한 대여의 대여일
-            "r_c_category": r_c_category,                            # 작성한 취소 사유
+            "r_c_category": r_c_category,                            # 저장한 취소 사유 (팀장이 작성한 글)
+            "cancel_reason": CANCEL_REASONS.get(r_c_category, r_c_category),  # 화면 표시용 취소 사유
             "is_refunded": payment is not None,                      # 결제 취소(환불) 여부
             "refund_amount": payment["p_amount"] if payment else 0,  # 환불 금액
+            "refund_c_id_seq": payment["c_id_seq"] if payment else None,  # 환불 대상 (실제로 결제한 회원)
         }
     except HTTPException:
         if connection is not None:
@@ -438,3 +463,5 @@ def cancel_ground_reservation(
 
 # 최종 수정 일 : 2026-10-26
 # 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (소셜 회원 ID 입력 길이 DB 정합성 적용)
+# 최종 수정 일 : 2026-10-28 수정자 : 신현진 (회원 취소 사유 글 검사, 환불 대상 안내)
+# 최종 수정 일 : 2026-10-29 / 작업자 : 최현준 (main 환불 대상 안내와 소셜 회원 ID 길이 처리 통합)
