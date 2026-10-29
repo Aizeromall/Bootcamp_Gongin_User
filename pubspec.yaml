@@ -53,7 +53,23 @@ dependencies:
   table_calendar: ^3.3.0
   # 수정 일 : 2026-10-27 / 작업자 : 양태건 (채팅 실시간 통신)
   web_socket_channel: ^3.0.3
-
+  # Firebase_core
+  # 수정 일 : 2026-10-28 / 작업자 : 최현준
+  # GoogleSignIn iOS 9.x의 GTMSessionFetcher 조건과 맞는 최신 Firebase 12.x 조합을 고정합니다.
+  # 버그 발생 일 : 2026-10-28 / 위치 : iOS Swift Package Manager 의존성 해결
+  # 1. 발생 위치 : Firebase 13.1.1 + GoogleSignIn 9.x
+  # 2. 내용 : GTMSessionFetcher 4.x 이상 / 4.x 미만 요구가 충돌
+  # 3. 수정 : Firebase 12.19.3을 사용하는 최신 4.x/6.x/16.x 패치로 고정
+  # 4. 테스트 : pub get·Flutter 48개·iOS 시뮬레이터 빌드 및 시작 화면 확인 통과
+  # 5. 보완 : Google Flutter 플러그인의 네이티브 10.x 지원 시 최신 Firebase 재검토
+  firebase_core: 4.15.2
+  # Firebase_messaging
+  firebase_messaging: 16.7.1
+  # 수정 일 : 2026-10-28 / 작업자 : 최현준 (모바일 간편 로그인)
+  firebase_auth: 6.7.1
+  google_sign_in: ^7.2.0
+  kakao_flutter_sdk_user: ^1.9.7+3
+  naver_login_sdk: ^3.2.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -81,8 +97,9 @@ flutter:
   uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - images/a_dot_burr.jpeg
+  assets:
+    # 수정 일 : 2026-10-28 / 작업자 : 최현준 (실제 간편 로그인 이미지 경로)
+    - assets/images/
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

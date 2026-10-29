@@ -1,1 +1,7 @@
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"
 #include "Generated.xcconfig"
+// 수정 일 : 2026-10-28 / 작업자 : 최현준 (실제 키는 Git 제외 파일로 관리)
+#include "Social.example.xcconfig"
+#include? "Social.local.xcconfig"
+#include? "Signing.local.xcconfig"
+// 최종 수정 일 : 2026-10-28 / 작업자 : 최현준

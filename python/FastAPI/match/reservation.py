@@ -22,6 +22,8 @@ from .reservation_status import (
     reservation_type_condition,
 )
 
+from ..notification.events import enqueue_confirmed_slot
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 TIME_SLOTS = {
@@ -83,7 +85,15 @@ def sport_from_customer_id(customer_id_sequence: str) -> str:
     },
 )
 def create_reservation(
-    c_id_seq: Annotated[str, Body(min_length=4, max_length=45, description="회원 아이디 + 종목 번호")],
+    # ************************
+    # 버그 확인 일 : 2026-10-28 / 작업자 : 최현준
+    # 1. 버그 발생 위치 : 예약·결제·대여 API의 c_id_seq Body 최대 길이
+    # 2. 버그 내용 : 45자 제한으로 DB에 저장 가능한 48자 소셜 PK가 422로 차단
+    # 3. 디버깅 내용 : 세 API의 회원 FK 입력 제한을 VARCHAR(50)에 맞춤
+    # 4. 테스트 사항 : 48/50자 업무 성공·51자 사전 차단·Swagger·결제 소유자 검사
+    # 5. 결과 및 추후 보완 사항 : ID 생성·종목 suffix·예약 분류·DB 구조는 변경하지 않음
+    # ************************
+    c_id_seq: Annotated[str, Body(min_length=4, max_length=50, description="회원 아이디 + 종목 번호 (customer FK, 최대 50자)")],
     g_code: Annotated[str, Body(min_length=1, max_length=45, description="ground 테이블의 구장 코드")],
     r_date: Annotated[date, Body(description="예약 일자")],
     rs_time: Annotated[str, Body(description="예약 시작 시간: 08:00~22:00, 2시간 단위")],
@@ -195,6 +205,8 @@ def create_reservation(
                             AND {category_condition(False)} AND {reservation_type_condition(RESERVATION_MATCH)}""",
                     (True, g_code, r_date, rs_time),
                 )
+                # 정원 충족에 따른 매치 성사와 알림 이벤트를 동일 트랜잭션으로 저장합니다.
+                enqueue_confirmed_slot(cursor, g_code, r_date, rs_time)
 
         # 중간 수정 작성자 - 신현진
         # 수정일 2026.10.26
@@ -227,3 +239,5 @@ def create_reservation(
             connection.close()
 
 # 최종 수정 일 : 2026-10-26 / 작업자 : 양태건 (실제 배정 요일·시간 연결) / 수정자 : 신현진 (구장 대여 시간대 차단)
+# 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (매치 성사 알림 outbox 연결)
+# 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (소셜 회원 ID 입력 길이 DB 정합성 적용)

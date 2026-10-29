@@ -392,3 +392,13 @@ ios/Flutter/ephemeral/
 ios/Flutter/Generated.xcconfig
 ios/Flutter/flutter_export_environment.sh
 android/local.properties
+android/.kotlin/
+config/social.local.json
+ios/Flutter/Social.local.xcconfig
+ios/Flutter/Signing.local.xcconfig
+
+# 실제 Firebase SDK 설정과 서비스 계정은 각 개발 환경에서 별도 생성합니다.
+ios/Runner/GoogleService-Info.plist
+lib/firebase_options.dart
+**/service-account*.json
+**/*firebase-adminsdk*.json

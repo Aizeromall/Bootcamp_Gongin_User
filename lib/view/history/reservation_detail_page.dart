@@ -79,7 +79,8 @@ class ReservationDetailPage extends ConsumerWidget {
                       children: [
                         MemberInfoRow(
                           '이용 구분',
-                          row['reservation_category'] == 2
+                          // 수정 일 : 2026-10-28 / 작업자 : 최현준 (예약 분류 문자열 계약)
+                          row['reservation_category'] == '2'
                               ? '구장 전체 대여'
                               : '실력 매칭',
                         ),
@@ -144,3 +145,4 @@ class ReservationDetailPage extends ConsumerWidget {
   }
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (예약 분류 문자열 비교)

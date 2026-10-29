@@ -186,7 +186,8 @@ def select_ground_reservation_slots(g_code: str, r_date: date):
     },
 )
 def create_ground_reservation(
-    c_id_seq: Annotated[str, Body(min_length=4, max_length=45, description="대여하는 회원 (회원 아이디 + 종목 번호)")],
+    # 수정 일 : 2026-10-28 / 작업자 : 최현준 — 기존 FK를 유지하면서 48자 소셜 회원 PK를 허용합니다.
+    c_id_seq: Annotated[str, Body(min_length=4, max_length=50, description="대여하는 회원 (customer FK, 최대 50자)")],
     g_code: Annotated[str, Body(min_length=1, max_length=45, description="ground 테이블의 구장 코드")],
     r_date: Annotated[date, Body(description="대여 일자")],
     rs_time: Annotated[str, Body(description="대여 시작 시간: 08:00~22:00, 2시간 단위")],
@@ -460,4 +461,7 @@ def cancel_ground_reservation(
         if connection is not None:
             connection.close()  # 성공/실패 상관없이 DB 연결 종료
 
+# 최종 수정 일 : 2026-10-26
+# 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (소셜 회원 ID 입력 길이 DB 정합성 적용)
 # 최종 수정 일 : 2026-10-28 수정자 : 신현진 (회원 취소 사유 글 검사, 환불 대상 안내)
+# 최종 수정 일 : 2026-10-29 / 작업자 : 최현준 (main 환불 대상 안내와 소셜 회원 ID 길이 처리 통합)

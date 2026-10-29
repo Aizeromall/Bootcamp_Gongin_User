@@ -29,15 +29,20 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   Future<void> login() async {
-    if (busy || password.text.isEmpty) return;
+    final sessionToken = ref.read(sessionProvider)?['access_token'] as String?;
+    if (busy || (sessionToken == null && password.text.isEmpty)) return;
     final id = ref.read(memberIdProvider);
     setState(() => busy = true);
     try {
       final result = await ref
           .read(memberApiProvider)
           .request(
-            '/chat/token',
-            body: {'c_id_seq': id, 'c_pw': password.text},
+            sessionToken == null ? '/chat/token' : '/chat/session-token',
+            body: {
+              'c_id_seq': id,
+              if (sessionToken == null) 'c_pw': password.text,
+            },
+            accessToken: sessionToken,
           );
       if (!mounted || ref.read(memberIdProvider) != id) return;
       password.clear();
@@ -79,19 +84,26 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   @override
   Widget build(BuildContext context) {
     final token = ref.watch(chatTokenProvider);
+    final hasSessionToken =
+        ref.watch(sessionProvider)?['access_token'] is String;
     return pageContent([
       heading('함께 나누는 대화', '소속팀명을 기본 이름으로 채팅방을 만들고 회원을 초대하세요.'),
       if (token == null) ...[
-        const Text('채팅을 이용하려면 현재 종목 계정의 비밀번호로 인증해 주세요.'),
-        const SizedBox(height: 16),
-        TextField(
-          controller: password,
-          obscureText: true,
-          enableSuggestions: false,
-          autocorrect: false,
-          decoration: const InputDecoration(labelText: '비밀번호'),
-          onSubmitted: (_) => login(),
+        Text(
+          hasSessionToken
+              ? '로그인한 계정으로 현재 종목의 채팅을 연결합니다.'
+              : '채팅을 이용하려면 현재 종목 계정의 비밀번호로 인증해 주세요.',
         ),
+        const SizedBox(height: 16),
+        if (!hasSessionToken)
+          TextField(
+            controller: password,
+            obscureText: true,
+            enableSuggestions: false,
+            autocorrect: false,
+            decoration: const InputDecoration(labelText: '비밀번호'),
+            onSubmitted: (_) => login(),
+          ),
         const SizedBox(height: 12),
         FilledButton(
           onPressed: busy ? null : login,
@@ -192,3 +204,4 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 }
 // 최종 수정 일 : 2026-10-27 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (서비스 JWT 기반 채팅 연결)

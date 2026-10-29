@@ -4,4 +4,7 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- 수정 일 : 2026-10-28 / 작업자 : 최현준 / LAN FastAPI 테스트용 HTTP는 debug만 허용 -->
+    <application android:usesCleartextTraffic="true" />
 </manifest>
+<!-- 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 -->

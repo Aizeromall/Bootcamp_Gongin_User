@@ -1,0 +1,16 @@
+{
+  // 작업자 : 양태건 / 최초 작업 일 : 2026-10-28
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "공IN 회원앱 (로컬 설정)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "toolArgs": [
+        "--dart-define-from-file=${workspaceFolder}/config/social.local.json"
+      ]
+    }
+  ]
+  // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+}
