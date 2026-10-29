@@ -1,8 +1,8 @@
 // 작업자 : 최현준
 // 최초 작업 일 : 2026-10-28
-// Social.local.xcconfig에 실제 값을 작성하세요. Dart SDK 키는 config/social.local.json에도 입력합니다.
-KAKAO_NATIVE_APP_KEY = not-configured
+// 직접 중복 입력하지 않습니다. tools/prepare_mobile_config.py가 .env/Firebase plist로 생성합니다.
+KAKAO_NATIVE_APP_KEY =
 GOOGLE_IOS_CLIENT_ID =
-GOOGLE_REVERSED_CLIENT_ID = gongin-google-not-configured
+GOOGLE_REVERSED_CLIENT_ID =
 NAVER_URL_SCHEME = gongin-naver
-// 최종 수정 일 : 2026-10-28 / 작업자 : 최현준
+// 최종 수정 일 : 2026-10-29 / 작업자 : 최현준

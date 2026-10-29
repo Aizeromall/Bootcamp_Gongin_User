@@ -1,5 +1,7 @@
 // 작업자 : 최현준
 // 최초 작업 일 : 2026-10-28
+// 수정 일 : 2026-10-29 / 작업자 : 최현준
+// Google iOS 설정 누락은 Firebase 앱 설정 파일 재다운로드 절차로 안내합니다.
 import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -15,7 +17,6 @@ import 'social_login_exception.dart';
 class SocialLoginService {
   SocialLoginService({
     this.settings = const {
-      'GOOGLE_IOS_CLIENT_ID': String.fromEnvironment('GOOGLE_IOS_CLIENT_ID'),
       'KAKAO_NATIVE_APP_KEY': String.fromEnvironment('KAKAO_NATIVE_APP_KEY'),
       'NAVER_CLIENT_ID': String.fromEnvironment('NAVER_CLIENT_ID'),
       'NAVER_CLIENT_SECRET': String.fromEnvironment('NAVER_CLIENT_SECRET'),
@@ -95,14 +96,12 @@ class SocialLoginService {
     String callback;
     String? client;
     if (provider == 'google') {
-      client = _setting('GOOGLE_IOS_CLIENT_ID');
-      if (client.isEmpty) {
-        client = (native['googleClientId'] as String? ?? '').trim();
-      }
+      // Google ID는 네이티브 Firebase 설정에서만 읽습니다. 중복 Dart 설정은 제거합니다.
+      client = (native['googleClientId'] as String? ?? '').trim();
       if (!RegExp(r'^[a-zA-Z0-9-]+\.apps\.googleusercontent\.com$')
           .hasMatch(client)) {
         throw const SocialLoginException(
-          'Google iOS Client ID가 없습니다. iOS Google 로그인 설정이 필요합니다.',
+          'Firebase에서 Google 로그인을 활성화한 뒤 iOS GoogleService-Info.plist를 다시 받아 앱을 빌드해 주세요.',
         );
       }
       callback =
@@ -233,4 +232,4 @@ class SocialLoginService {
     }
   }
 }
-// 최종 수정 일 : 2026-10-28 / 작업자 : 최현준
+// 최종 수정 일 : 2026-10-29 / 작업자 : 최현준
