@@ -1,0 +1,12 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "모바일 로그인 설정 동기화",
+      "type": "process",
+      "command": "python3",
+      "args": ["${workspaceFolder}/tools/prepare_mobile_config.py"],
+      "problemMatcher": []
+    }
+  ]
+}

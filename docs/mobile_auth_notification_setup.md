@@ -35,8 +35,8 @@ flutter run --dart-define-from-file=config/social.local.json
 - 이번 푸시는 **Android만 등록/발송**합니다. iOS FCM/APNs는 추가하지 않았습니다.
 - 간편 로그인 SDK 호출은 Android·iOS를 지원합니다. iOS 실로그인은 콘솔/콜백 설정 후 별도 검증해야 합니다.
 - Google 활성화 후 iOS `GoogleService-Info.plist`도 다시 받습니다. 현재 파일에는 CLIENT_ID·REVERSED_CLIENT_ID가 없습니다.
-- `ios/Flutter/Social.example.xcconfig`를 참고해 Git 제외된 `Social.local.xcconfig`에 실제 `GOOGLE_IOS_CLIENT_ID`, `GOOGLE_REVERSED_CLIENT_ID`, `KAKAO_NATIVE_APP_KEY`, `NAVER_URL_SCHEME`를 입력합니다.
-- 로컬 JSON에도 iOS용 `GOOGLE_IOS_CLIENT_ID`를 추가합니다. 카카오 키와 네이버 스킴은 xcconfig와 같아야 합니다. 콘솔에 iOS Bundle ID/URL Scheme을 등록합니다.
+- `python3 tools/prepare_mobile_config.py`로 `.env`의 모바일 허용 목록과 Firebase plist에서 로컬 JSON/xcconfig를 생성합니다. Google ID를 별도로 입력하지 않습니다.
+- 콘솔에 iOS Bundle ID/URL Scheme을 등록합니다. 상세 설정은 `developer_login_setup.md`를 따릅니다.
 - 후속 호환성 검증에서 iOS 시뮬레이터 빌드·시작 화면 표시를 확인했습니다. 실제 기기 서명·간편 로그인은 미검증입니다.
 
 ### iOS 패키지 호환 수정 (2026-10-28 / 최현준)

@@ -1,5 +1,14 @@
 # bootcamp_project_gongin_admin_app
 
+## 모바일 로그인 설정 정리 (2026-10-29 / 최현준)
+
+현재 설정 절차는 [개발자 로그인 설정](docs/developer_login_setup.md)을 따릅니다.
+`python3 tools/prepare_mobile_config.py`가 `.env`의 모바일 허용 목록과 Firebase iOS plist에서
+Git 제외된 실행 JSON/xcconfig를 생성합니다. Google iOS ID를 Dart에 중복 입력하지 않습니다.
+VS Code의 `공IN 회원앱 (로컬 설정)`은 실행 전에 동기화하며, 터미널 실행은 위 명령을 먼저 실행합니다.
+실물 Google 로그인은 사용자 정상 동작 보고가 있으나 독립적인 재현 검증은 미완료입니다.
+카카오·네이버 및 실물 채팅 실패는 담당자와 후속 확인이 필요하며 정상 동작 완료로 간주하지 않습니다.
+
 ## GitHub 공유 시 제외하는 로컬 설정
 
 실제 `.env`, `config/social.local.json`, `ios/Flutter/Social.local.xcconfig`, `Signing.local.xcconfig`, 서비스 계정 JSON, `google-services.json`, `GoogleService-Info.plist`, `lib/firebase_options.dart`는 업로드하지 않습니다. 새 환경은 `.env.example`과 `config/social.example.json`, `ios/Flutter/Social.example.xcconfig`를 참고하고, Firebase 콘솔/FlutterFire 설정으로 본인 프로젝트의 플랫폼 설정 파일과 `firebase_options.dart`를 생성해야 합니다. 생성 전에는 Firebase import 때문에 새 체크아웃의 Flutter 빌드가 실패할 수 있습니다. 비밀값을 소스나 PR 본문에 붙이지 마세요. 공유 정책 정리: 2026-10-28.

@@ -7,6 +7,7 @@
       "request": "launch",
       "type": "dart",
       "program": "lib/main.dart",
+      "preLaunchTask": "모바일 로그인 설정 동기화",
       "toolArgs": [
         "--dart-define-from-file=${workspaceFolder}/config/social.local.json"
       ]

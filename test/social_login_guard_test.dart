@@ -102,7 +102,7 @@ void main() {
     );
     await expectLater(
       service.authenticate('google'),
-      throwsA(message('Client ID')),
+      throwsA(message('GoogleService-Info.plist')),
     );
   });
 
@@ -201,4 +201,4 @@ void main() {
     });
   }
 }
-// 최종 수정 일 : 2026-10-28 / 작업자 : 최현준
+// 최종 수정 일 : 2026-10-29 / 작업자 : 최현준
