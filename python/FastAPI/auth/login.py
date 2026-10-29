@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
 from ..database import connect
-from .token import issue_token
+from .account_lifecycle import authentication_result
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -52,6 +52,8 @@ def verify_password(plain_password: str, stored_password: str) -> bool:
     "/login",
     status_code=status.HTTP_200_OK,
     responses={
+        200: {"description": "활성 종목 로그인 또는 recovery_required=true인 복구 전용 응답"},
+        403: {"description": "모든 종목의 복구 유예기간 경과"},
         status.HTTP_401_UNAUTHORIZED: {"description": "아이디 또는 비밀번호 불일치"},
         status.HTTP_422_UNPROCESSABLE_CONTENT: {"description": "요청 값 검증 실패"},
         status.HTTP_500_INTERNAL_SERVER_ERROR: {"description": "DB 연결 또는 로그인 처리 실패"},
@@ -77,10 +79,9 @@ def login_customer(payload: LoginRequest) -> dict:
             member_ids = [f"{payload.c_id}_{sport:02d}" for sport in range(1, 5)]
             cursor.execute(
                 """
-                SELECT c_id_seq, c_pw, c_name, c_prefer_stock
+                SELECT c_id_seq, c_pw, c_name, c_prefer_stock, c_deletdate
                 FROM customer
                 WHERE c_id_seq IN (%s, %s, %s, %s)
-                    AND c_deletdate IS NULL
                     AND c_login_type = 'local'
                 ORDER BY c_id_seq
                 """,
@@ -94,17 +95,11 @@ def login_customer(payload: LoginRequest) -> dict:
             # 존재하지 않는 아이디와 비밀번호 오류를 같은 응답으로 처리합니다.
             raise HTTPException(status_code=401, detail="아이디 또는 비밀번호가 올바르지 않습니다.")
 
-        return {
-            "result": "OK",
-            "c_id": payload.c_id,
-            "c_name": customers[0]["c_name"],
-            "preferred_stocks": [row["c_prefer_stock"] for row in customers],
-            # 기존 응답은 유지합니다. Front는 access_token을 Authorization: Bearer로 전달합니다.
-            # 종목별 PK 목록은 DB 조회 결과로만 구성하며 사용자가 임의로 지정하지 않습니다.
-            "c_id_seq": customers[0]["c_id_seq"],
-            "member_ids": [row["c_id_seq"] for row in customers],
-            **issue_token(payload.c_id, [row["c_id_seq"] for row in customers]),
-        }
+        # 수정 일 : 2026-10-29 / 작업자 : 최현준
+        # 삭제 대기도 본인 인증 후 조회하되, 전 종목 비활성 계정에는 복구 전용 토큰만 발급합니다.
+        if any(row["c_id_seq"] not in member_ids for row in customers):
+            raise HTTPException(status_code=401, detail="아이디 또는 비밀번호가 올바르지 않습니다.")
+        return authentication_result(payload.c_id, "local", customers)
     except HTTPException:
         raise
     except Exception:
@@ -116,3 +111,4 @@ def login_customer(payload: LoginRequest) -> dict:
 
 # 수정 일 : 2026-10-28 / 작업자 : 최현준 (간편가입자의 일반 비밀번호 로그인 차단)
 # 최종 수정 일 : 2026-10-28
+# 최종 수정 일 : 2026-10-29 / 작업자 : 최현준

@@ -31,6 +31,8 @@ class MemberApi {
       'DELETE' => client.delete(uri, headers: headers),
       'POST' => client.post(uri, headers: headers, body: jsonEncode(body)),
       'PUT' => client.put(uri, headers: headers, body: jsonEncode(body)),
+      // 수정 일 : 2026-10-29 / 작업자 : 최현준 — 회원정보 부분 수정 API.
+      'PATCH' => client.patch(uri, headers: headers, body: jsonEncode(body)),
       _ => throw ArgumentError.value(method, 'method', '지원하지 않는 요청 방식'),
     }).timeout(const Duration(seconds: 20));
     dynamic data;
@@ -76,3 +78,4 @@ class ApiException implements Exception {
   String toString() => '$message ($statusCode)';
 }
 // 최종 수정 일 : 2026-10-27 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-29 / 작업자 : 최현준

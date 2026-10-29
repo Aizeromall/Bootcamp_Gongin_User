@@ -51,7 +51,9 @@ def test_login_preserves_response_and_issues_exact_members():
         assert claims["member_ids"] == ["member_01", "member_03"]
         assert decode_chat_token(body["access_token"])["sub"] == "member_01"
         assert cursor.execute.call_args.args[1] == ("member_01", "member_02", "member_03", "member_04")
-        assert "c_deletdate IS NULL" in cursor.execute.call_args.args[0]
+        # 삭제 대기 행도 본인 인증 후 복구 여부를 판정하므로 SQL에서 숨기지 않습니다.
+        assert "c_deletdate" in cursor.execute.call_args.args[0]
+        assert "c_deletdate IS NULL" not in cursor.execute.call_args.args[0]
         connection.close.assert_called_once()
 
 
@@ -140,3 +142,4 @@ def load_tests(loader, tests, pattern):
                               if name.startswith("test_") and callable(fn))
 
 # 최종 수정 일 : 2026-10-27
+# 최종 수정 일 : 2026-10-29 / 작업자 : 최현준 (삭제 대기 회원 로그인 SQL 계약 검증)

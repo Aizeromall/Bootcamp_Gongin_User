@@ -10,6 +10,13 @@ final memberApiProvider = Provider<MemberApi>((ref) {
   return api;
 });
 const sports = {1: '축구', 2: '농구', 3: '야구', 4: '배구'};
+// 수정 일 : 2026-10-29 / 작업자 : 최현준 — 가입·수정 화면에서 같은 포지션 계약 사용.
+const sportPositions = {
+  1: ['FW', 'MF', 'DF', 'GK'],
+  2: ['센터', '가드', '포워드'],
+  3: ['투수', '포수', '내야수', '외야수'],
+  4: ['세터', '리베로', '센터', '레프트', '라이트'],
+};
 
 /// 서버가 돌려준 가입 종목만 선택할 수 있습니다. 로그인 정보는 메모리에만 보관합니다.
 class MemberSession extends Notifier<Map<String, dynamic>?> {
@@ -63,3 +70,4 @@ class GroundRegion extends Notifier<String> {
 final groundRegionProvider = NotifierProvider<GroundRegion, String>(
   GroundRegion.new,
 );
+// 최종 수정 일 : 2026-10-29 / 작업자 : 최현준

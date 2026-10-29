@@ -12,6 +12,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 
 from ..database import connect
+from .account_lifecycle import now_kst
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -122,7 +123,9 @@ def register_customer(payload: RegisterRequest) -> dict:
                 raise HTTPException(status_code=409, detail="이미 사용 중인 아이디입니다.")
 
             # 가입일은 가입 요청이 처리되는 오늘 날짜로 넣습니다.
-            signup_date = date.today()
+            # 수정 일 : 2026-10-29 / 작업자 : 최현준
+            # c_signupdate는 계정 최초일이 아니라 해당 종목을 선택한 한국 시각입니다.
+            signup_date = now_kst()
             rows = [
                 (
                     f"{payload.c_id}_{sport:02d}",
@@ -136,6 +139,7 @@ def register_customer(payload: RegisterRequest) -> dict:
                     payload.c_team,
                     payload.c_position[sport],
                     signup_date,
+                    1500,
                 )
                 # c_id_seq의 끝 번호는 종목 코드와 같아야 예약 종목을 판별할 수 있습니다.
                 for sport in payload.preferred_stocks
@@ -144,8 +148,8 @@ def register_customer(payload: RegisterRequest) -> dict:
                 """
                 INSERT INTO customer (
                     c_id_seq, c_prefer_stock, c_pw, c_name, c_address, c_phone,
-                    c_gender, c_birthday, c_team, c_position, c_signupdate
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    c_gender, c_birthday, c_team, c_position, c_signupdate, c_rating
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 rows,
             )
@@ -176,3 +180,4 @@ def register_customer(payload: RegisterRequest) -> dict:
 # 최종 수정 일 : 2026-10-26 / 작업자 : 양태건
 # 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (간편로그인 ID 영역 보호)
 # 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (회원가입 입력 길이 DB 기준 적용)
+# 최종 수정 일 : 2026-10-29 / 작업자 : 최현준 (종목 선택 시각 및 초기 레이팅 고정)
