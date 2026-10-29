@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../vm/member_state.dart';
+import '../../vm/account_state.dart';
 import '../../vm/social_login_state.dart';
 import '../../service/member_api.dart';
 import '../../service/social_login_exception.dart';
@@ -46,7 +47,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           ),
         );
       } else {
-        acceptMemberSession(ref, result);
+        await completeLogin(result);
       }
     } on SocialLoginException catch (error) {
       if (mounted) showMessage(context, error.message);
@@ -99,7 +100,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       if (!mounted) {
         return;
       }
-      acceptMemberSession(ref, result);
+      await completeLogin(result);
     } catch (error) {
       if (mounted) {
         showMessage(context, error);
@@ -109,6 +110,50 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         setState(() => busy = false);
       }
     }
+  }
+
+  // 수정 일 : 2026-10-29 / 작업자 : 최현준
+  // 정상 로그인과 복구 인증을 구분합니다. 아니오/닫기는 DB와 일반 세션을 변경하지 않습니다.
+  Future<void> completeLogin(Map<String, dynamic> result) async {
+    if (result['recovery_required'] == true) {
+      final token = result['recovery_token'];
+      final recoverable = (result['sports'] as List? ?? [])
+          .whereType<Map>()
+          .where((row) => row['state'] == 'recoverable')
+          .map((row) => int.tryParse('${row['sport']}'))
+          .whereType<int>()
+          .where(sports.containsKey)
+          .toSet()
+          .toList();
+      if (token is! String || token.isEmpty || recoverable.isEmpty) {
+        throw const ApiException(403, '복구 가능한 종목이 없습니다.');
+      }
+      final yes = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('계정 복구'),
+          content: Text(
+            '정말로 복구하시겠습니까?\n복구할 종목: ${recoverable.map((s) => sports[s]).join(', ')}\n'
+            '30일이 지난 종목은 복구되지 않습니다.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('아니오'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('예'),
+            ),
+          ],
+        ),
+      );
+      if (yes != true || !mounted) return;
+      result = await ref.read(accountRecoveryProvider)(token, recoverable);
+      if (!mounted || ref.read(sessionProvider) != null) return;
+    }
+    acceptMemberSession(ref, result);
+    password.clear();
   }
 
   @override
@@ -221,3 +266,4 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
 // 최종 수정 일 : 2026-10-28 / 작업자 : 최현준
+// 최종 수정 일 : 2026-10-29 / 작업자 : 최현준

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../vm/member_state.dart';
+import 'account_profile_page.dart';
 import '../shared/member_components.dart';
 import '../shared/member_style.dart';
 import '../inquiry/inquiry_page.dart';
@@ -31,65 +32,79 @@ class AccountPage extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        MemberPanel(
-          color: Colors.white,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 수정 일 : 2026-10-28 / 작업자 : 양태건
-              // 목업처럼 프로필을 가로로 배치하고 실제 가입 종목만 표시합니다.
-              Row(
+        // 수정 일 : 2026-10-29 / 작업자 : 최현준 — MY 프로필 카드를 회원정보 수정에 연결합니다.
+        Semantics(
+          button: true,
+          label: '회원정보 수정',
+          child: InkWell(
+            onTap: () => open(const AccountProfilePage()),
+            borderRadius: BorderRadius.circular(18),
+            child: MemberPanel(
+              color: Colors.white,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: MemberStyle.ink,
-                    child: Text(
-                      name.isEmpty ? '회' : name.characters.first,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${session['c_name'] ?? '회원'}',
+                  // 수정 일 : 2026-10-28 / 작업자 : 양태건
+                  // 목업처럼 프로필을 가로로 배치하고 실제 가입 종목만 표시합니다.
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 24,
+                        backgroundColor: MemberStyle.ink,
+                        child: Text(
+                          name.isEmpty ? '회' : name.characters.first,
                           style: const TextStyle(
-                            fontSize: 20,
+                            color: Colors.white,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
-                        Text(
-                          '@${session['c_id'] ?? ''}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: MemberStyle.muted,
-                          ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${session['c_name'] ?? '회원'}',
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            Text(
+                              '@${session['c_id'] ?? ''}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: MemberStyle.muted,
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                      const Icon(
+                        Icons.edit_outlined,
+                        color: MemberStyle.muted,
+                        size: 20,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 6,
+                    children: [
+                      for (final code
+                          in (session['preferred_stocks'] as List? ?? []))
+                        MemberStatusBadge(
+                          sports[int.tryParse('$code')] ?? '$code',
+                          color: int.tryParse('$code') == 1
+                              ? MemberStyle.green
+                              : MemberStyle.blue,
+                        ),
+                    ],
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 6,
-                children: [
-                  for (final code
-                      in (session['preferred_stocks'] as List? ?? []))
-                    MemberStatusBadge(
-                      sports[int.tryParse('$code')] ?? '$code',
-                      color: int.tryParse('$code') == 1
-                          ? MemberStyle.green
-                          : MemberStyle.blue,
-                    ),
-                ],
-              ),
-            ],
+            ),
           ),
         ),
         const MemberSectionTitle('내 활동'),
@@ -153,4 +168,4 @@ class AccountPage extends ConsumerWidget {
     ),
   );
 }
-// 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-29 / 작업자 : 최현준

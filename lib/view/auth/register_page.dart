@@ -25,12 +25,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   // 작업자 : 양태건 / 최종 수정일 : 2026-10-26
   final selected = <int>{};
   final positions = <int, String>{};
-  static const positionOptions = {
-    1: ['FW', 'MF', 'DF', 'GK'],
-    2: ['센터', '가드', '포워드'],
-    3: ['투수', '포수', '내야수', '외야수'],
-    4: ['세터', '리베로', '센터', '레프트', '라이트'],
-  };
   String gender = '남성';
   DateTime? birthday;
   bool busy = false;
@@ -257,7 +251,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 decoration: InputDecoration(
                   labelText: '${sports[sport]} 선호 포지션',
                 ),
-                items: positionOptions[sport]!
+                items: sportPositions[sport]!
                     .map((p) => DropdownMenuItem(value: p, child: Text(p)))
                     .toList(),
                 onChanged: busy
@@ -292,3 +286,4 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
 // 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (간편가입 화면 재사용)
+// 최종 수정 일 : 2026-10-29 / 작업자 : 최현준 (공통 종목 포지션 재사용)

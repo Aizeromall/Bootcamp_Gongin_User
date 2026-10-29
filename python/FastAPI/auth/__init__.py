@@ -11,6 +11,7 @@ from .google import router as google_router
 from .kakao import router as kakao_router
 from .naver import router as naver_router
 from .social_account import router as social_register_router
+from .account import router as account_router
 
 # main.py의 prefix="/auth"와 결합해 /auth/register, /auth/login 경로를 생성합니다.
 auth_router = APIRouter()
@@ -23,5 +24,8 @@ auth_router.include_router(google_router)
 auth_router.include_router(kakao_router)
 auth_router.include_router(naver_router)
 auth_router.include_router(social_register_router, tags=["Auth Social Register"])
+# 프로필 및 종목 생명주기 router: main.py의 /auth prefix 아래에 연결합니다.
+auth_router.include_router(account_router)
 
 # 최종 수정 일 : 2026-10-28 / 작업자 : 최현준
+# 최종 수정 일 : 2026-10-29 / 작업자 : 최현준

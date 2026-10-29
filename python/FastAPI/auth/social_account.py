@@ -16,7 +16,8 @@ from ..database import connect
 from .register import RegisterRequest
 from .social_flow import put_flow, take_flow, FLOW_SECONDS
 from .social_http import SOCIAL_ERRORS
-from .token import issue_token, signing_key
+from .token import signing_key
+from .account_lifecycle import authentication_result
 
 router = APIRouter()
 PASSWORD_UNSUPPORTED = "간편로그인_비밀번호미지원"
@@ -66,18 +67,13 @@ def select_members(cursor, base: str, provider: str, lock: bool = False) -> list
     # DB의 대소문자 무시 collation으로 유사 해시가 조회돼도 다른 계정에 로그인하지 않습니다.
     if any(row["c_id_seq"] not in expected or row["c_login_type"] != provider for row in rows):
         raise HTTPException(status_code=409, detail="회원 식별자가 충돌합니다. 운영자에게 문의해 주세요.")
-    if rows and not any(row["c_deletdate"] is None for row in rows):
-        raise HTTPException(status_code=403, detail="탈퇴한 회원입니다.")
     return rows
 
 
 def login_response(base: str, provider: str, rows: list) -> dict:
-    active = [row for row in rows if row["c_deletdate"] is None]
-    return {"result": "OK", "signup_required": False, "c_id": base,
-            "c_id_seq": active[0]["c_id_seq"], "c_name": active[0]["c_name"],
-            "c_login_type": provider, "member_ids": [row["c_id_seq"] for row in active],
-            "preferred_stocks": [int(row["c_prefer_stock"]) for row in active],
-            **issue_token(base, [row["c_id_seq"] for row in active])}
+    # 수정 일 : 2026-10-29 / 작업자 : 최현준
+    # 모든 간편로그인 공급자에 같은 종목별 30일 유예·복구 정책을 적용합니다.
+    return authentication_result(base, provider, rows)
 
 
 def finish_identity(provider: str, subject: str) -> dict:
@@ -146,3 +142,4 @@ def register_social(
     return result
 
 # 최종 수정 일 : 2026-10-28
+# 최종 수정 일 : 2026-10-29 / 작업자 : 최현준 (종목별 유예 및 복구 전용 로그인)
