@@ -18,6 +18,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from ..database import connect
+from ..auth.token import decode_token as decode_account_token
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -71,8 +72,15 @@ def decode_chat_token(token: str) -> dict:
             raise ValueError("회원 ID 오류")
         return claims
     except (jwt.InvalidTokenError, ValueError, TypeError):
-        raise HTTPException(status_code=401, detail="채팅 로그인이 필요하거나 토큰이 만료되었습니다.",
-                            headers={"WWW-Authenticate": "Bearer"})
+        # 일반 로그인 JWT도 사용하되 기존 채팅 전용 JWT의 서명키·audience는 그대로 보존합니다.
+        # 채팅은 기존과 같이 종목별 ID 단위이며 기본값은 로그인 응답의 c_id_seq입니다.
+        try:
+            claims = decode_account_token(token)
+        except HTTPException as error:
+            # 공통 인증 미설정이어도 기존 채팅의 잘못된 JWT는 401로 처리합니다.
+            raise HTTPException(status_code=401, detail="로그인이 필요하거나 토큰이 만료되었습니다.",
+                                headers={"WWW-Authenticate": "Bearer"}) from error
+        return {**claims, "sub": claims["c_id_seq"]}
 
 
 def current_member(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> str:
@@ -169,3 +177,4 @@ def close_room(me_id: int = Path(gt=0), member_id: str = Depends(current_member)
     return {"result": "OK", "me_id": me_id, "me_state": "종료"}
 
 # 최종 수정 일 : 2026-10-27 / 작업자 : 양태건
+# 최종 수정 일 : 2026-10-27 / 작업자 : 최현준 (일반 로그인 JWT 호환)

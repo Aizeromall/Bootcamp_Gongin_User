@@ -1,0 +1,33 @@
+PODS:
+  - Alamofire (5.10.2)
+  - Flutter (1.0.0)
+  - naver_login_sdk (3.2.0):
+    - Alamofire (~> 5.10.1)
+    - Flutter
+    - naveridlogin-sdk-ios (~> 4.2.3)
+  - naveridlogin-sdk-ios (4.2.3)
+
+DEPENDENCIES:
+  - Flutter (from `Flutter`)
+  - naver_login_sdk (from `.symlinks/plugins/naver_login_sdk/ios`)
+
+SPEC REPOS:
+  trunk:
+    - Alamofire
+    - naveridlogin-sdk-ios
+
+EXTERNAL SOURCES:
+  Flutter:
+    :path: Flutter
+  naver_login_sdk:
+    :path: ".symlinks/plugins/naver_login_sdk/ios"
+
+SPEC CHECKSUMS:
+  Alamofire: 7193b3b92c74a07f85569e1a6c4f4237291e7496
+  Flutter: 71a624a5bc0c04062bf19101d501e466baf2fb47
+  naver_login_sdk: daf2302b38c4060e606a2bd9572f7bc38445d47e
+  naveridlogin-sdk-ios: d9d46d02119d303023d7000cd5963864d5bb89e5
+
+PODFILE CHECKSUM: 3ba3a73b1b12adcf321a227a745625fe0888cc82
+
+COCOAPODS: 1.17.0

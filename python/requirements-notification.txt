@@ -1,0 +1,6 @@
+# 작업자 : 최현준
+# 최초 작업 일 : 2026-10-27
+# JWT는 기존 채팅과 같은 PyJWT를 사용합니다. Firebase Admin은 후속 발송 worker용입니다.
+PyJWT>=2.10,<3
+firebase-admin>=7,<8
+# 최종 수정 일 : 2026-10-27

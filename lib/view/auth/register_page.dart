@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../vm/member_state.dart';
+import '../../vm/social_login_state.dart';
 import '../shared/ui.dart';
 import '../shared/member_style.dart';
 
 class RegisterPage extends ConsumerStatefulWidget {
-  const RegisterPage({super.key});
+  const RegisterPage({super.key, this.signupTicket});
+  final String? signupTicket;
   @override
   ConsumerState<RegisterPage> createState() => _RegisterPageState();
 }
@@ -33,6 +35,13 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   DateTime? birthday;
   bool busy = false;
   int step = 0;
+  bool get social => widget.signupTicket != null;
+  @override
+  void initState() {
+    super.initState();
+    if (social) step = 1;
+  }
+
   final confirmation = TextEditingController();
   @override
   void dispose() {
@@ -44,6 +53,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   }
 
   Future<void> submit() async {
+    if (busy) return;
     if (!form.currentState!.validate()) {
       return;
     }
@@ -53,23 +63,27 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     }
     // 수정 일 : 2026-10-28 / 작업자 : 양태건
     // 스크롤 밖의 필드도 입력 상태를 확인하여 누락된 포지션을 전송하지 않습니다.
-    if (fields.values.any((controller) => controller.text.trim().isEmpty) ||
+    if (fields.entries
+            .where((entry) => !social || !['c_id', 'c_pw'].contains(entry.key))
+            .any((entry) => entry.value.text.trim().isEmpty) ||
         selected.any((sport) => positions[sport] == null)) {
       showMessage(context, '기본 정보와 선택한 종목의 포지션을 모두 입력해 주세요.');
       return;
     }
     setState(() => busy = true);
     try {
-      await ref
+      final result = await ref
           .read(memberApiProvider)
           .request(
-            '/auth/register',
+            social ? '/auth/social/register' : '/auth/register',
             body: {
               for (final entry in fields.entries)
-                entry.key: entry.key == 'c_pw'
-                    ? entry.value.text
-                    : entry.value.text.trim(),
-              'c_team': '무소속',
+                if (!social || !['c_id', 'c_pw'].contains(entry.key))
+                  entry.key: entry.key == 'c_pw'
+                      ? entry.value.text
+                      : entry.value.text.trim(),
+              if (social) 'signup_ticket': widget.signupTicket,
+              if (!social) 'c_team': '무소속',
               // 디버그: JSON 객체 키는 문자열, 값은 해당 종목의 포지션입니다.
               // 작업자 : 양태건 / 최종 수정일 : 2026-10-26
               'c_position': {
@@ -83,7 +97,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       if (!mounted) {
         return;
       }
-      showMessage(context, '가입이 완료되었습니다. 로그인해 주세요.');
+      if (social) acceptMemberSession(ref, result);
+      showMessage(
+        context,
+        social ? '간편가입이 완료되었습니다.' : '가입이 완료되었습니다. 로그인해 주세요.',
+      );
       Navigator.pop(context);
     } catch (error) {
       if (mounted) {
@@ -110,7 +128,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         'c_pw': 128,
         'c_name': 45,
         'c_address': 255,
-        'c_phone': 30,
+        'c_phone': 20,
       }[key],
       decoration: InputDecoration(labelText: label),
       validator: (value) {
@@ -124,39 +142,40 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       title: const Text('회원가입'),
-      leading: step == 0
+      leading: step == 0 || social
           ? null
           : BackButton(onPressed: busy ? null : () => setState(() => step = 0)),
     ),
     body: Form(
       key: form,
       child: pageContent([
-        Row(
-          children: [
-            Text(
-              '1 계정 정보',
-              style: TextStyle(
-                color: step == 0 ? MemberStyle.blue : MemberStyle.muted,
-                fontWeight: FontWeight.w800,
+        if (!social)
+          Row(
+            children: [
+              Text(
+                '1 계정 정보',
+                style: TextStyle(
+                  color: step == 0 ? MemberStyle.blue : MemberStyle.muted,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
-            ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12),
-              child: Icon(
-                Icons.chevron_right,
-                size: 16,
-                color: MemberStyle.muted,
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 12),
+                child: Icon(
+                  Icons.chevron_right,
+                  size: 16,
+                  color: MemberStyle.muted,
+                ),
               ),
-            ),
-            Text(
-              '2 기본 정보',
-              style: TextStyle(
-                color: step == 1 ? MemberStyle.blue : MemberStyle.muted,
-                fontWeight: FontWeight.w800,
+              Text(
+                '2 기본 정보',
+                style: TextStyle(
+                  color: step == 1 ? MemberStyle.blue : MemberStyle.muted,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
         const SizedBox(height: 24),
         if (step == 0) ...[
           heading('계정 정보를 입력해 주세요', '로그인에 사용할 아이디와 비밀번호를 설정하세요.'),
@@ -176,6 +195,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           input('c_phone', '전화번호'),
         ] else ...[
           heading('기본 정보를 입력해 주세요', '선호 종목마다 포지션을 하나씩 선택해 주세요.'),
+          if (social) input('c_phone', '전화번호'),
           input('c_name', '이름'),
           input('c_address', '주소'),
           DropdownButtonFormField<String>(
@@ -271,3 +291,4 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   );
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (간편가입 화면 재사용)

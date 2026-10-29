@@ -4,6 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'vm/member_state.dart';
+import 'vm/notification_state.dart';
+import 'vm/social_login_state.dart';
+import 'view/history/reservation_detail_page.dart';
+import 'view/chat/chat_page.dart';
 import 'view/shared/member_style.dart';
 import 'view/auth/login_page.dart';
 import 'view/auth/welcome_page.dart';
@@ -23,6 +27,33 @@ class MyApp extends ConsumerStatefulWidget {
 class _MyAppState extends ConsumerState<MyApp> {
   final navigator = GlobalKey<NavigatorState>();
   late bool started;
+
+  // 수신 payload는 NotificationState에서 현재 계정 소유 여부를 확인합니다.
+  void openNotification(Map<String, dynamic> data) {
+    final session = ref.read(sessionProvider);
+    if (session == null) return;
+    final members = session['member_ids'] as List? ?? [session['c_id_seq']];
+    if (!members.contains(data['c_id_seq'])) return;
+    final member = data['c_id_seq'] as String?;
+    final sport = int.tryParse(member?.split('_').last ?? '');
+    if (sport != null && sports.containsKey(sport)) {
+      ref.read(sportProvider.notifier).select(sport);
+    }
+    final seq = int.tryParse('${data['r_seq']}');
+    navigator.currentState?.push(
+      MaterialPageRoute<void>(
+        builder: (_) => data['type'] == 'message'
+            ? Scaffold(
+                appBar: AppBar(title: const Text('메시지')),
+                body: const ChatPage(),
+              )
+            : seq != null
+            ? ReservationDetailPage(seq: seq)
+            : const MemberHome(),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -31,6 +62,35 @@ class _MyAppState extends ConsumerState<MyApp> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(notificationProvider);
+    ref.watch(socialLogoutProvider);
+    ref.listen(notificationProvider, (previous, next) {
+      final data = next['message'];
+      if (data is! Map<String, dynamic> ||
+          identical(previous?['message'], data)) {
+        return;
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || ref.read(sessionProvider) == null) return;
+        if (next['open'] == true) {
+          openNotification(data);
+        } else {
+          final context = navigator.currentContext;
+          if (context != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(notificationTitles[data['type']] ?? '새 알림'),
+                action: SnackBarAction(
+                  label: '확인',
+                  onPressed: () => openNotification(data),
+                ),
+              ),
+            );
+          }
+        }
+        ref.read(notificationProvider.notifier).clearMessage();
+      });
+    });
     ref.listen(sessionProvider, (previous, next) {
       if (next == null && previous != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -168,3 +228,4 @@ class _MyAppState extends ConsumerState<MyApp> {
   }
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (FCM 수신 및 기존 화면 연결)

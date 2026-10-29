@@ -19,6 +19,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from ..match.reservation_status import (
     CANCEL_REASONS,
+    RESERVATION_MATCH,
     RESERVATION_RENTAL,
     RESERVED_CANCEL_CODES,
     category_condition,
@@ -79,7 +80,8 @@ def delete_customer_reservation(
             # 1-1) 구장대여(reservation_category = 2)는 구장대여 취소 API에서만 취소
             # (실력매칭 취소 규칙 r_check 등과 섞이지 않게 분리)
             # 값이 없으면 DB 기본값과 같은 1(실력매칭)로 봄
-            if reservation.get("reservation_category", 1) == RESERVATION_RENTAL:
+            # 수정 일 : 2026-10-28 / 작업자 : 최현준 — 문자열 '2'인 대여도 개인 취소 API에서 차단합니다.
+            if reservation.get("reservation_category", RESERVATION_MATCH) == RESERVATION_RENTAL:
                 raise HTTPException(
                     status_code=409,
                     detail="구장대여 예약은 /ground/reservation/{r_seq} 에서 취소해 주세요.",
@@ -159,4 +161,7 @@ def delete_customer_reservation(
         if connection is not None:
             connection.close()  # 성공/실패 상관없이 DB 연결 종료
 
+# 최종 수정 일 : 2026-10-26 / 작업자 : 양태건 / 수정자 : 신현진 (구장대여 예약 취소 분리)
+# 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (문자열 예약 분류로 대여 취소 경로 차단)
 # 최종 수정 일 : 2026-10-28 / 작업자 : 양태건 / 수정자 : 신현진 (구장대여 예약 취소 분리, 회원 취소 사유 글 검사)
+# 최종 수정 일 : 2026-10-29 / 작업자 : 최현준 (main 취소 사유 규칙과 문자열 예약 분류 처리 통합)

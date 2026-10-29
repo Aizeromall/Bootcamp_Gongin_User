@@ -1,9 +1,15 @@
 // 작업자 : 최현준
 // 최초 작업 일 : 2026-10-24
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../vm/member_state.dart';
+import '../../vm/social_login_state.dart';
+import '../../service/member_api.dart';
+import '../../service/social_login_exception.dart';
+import '../../service/social_login_service.dart';
 import '../shared/ui.dart';
 import '../shared/member_components.dart';
 import '../shared/member_style.dart';
@@ -20,6 +26,56 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   final id = TextEditingController();
   final password = TextEditingController();
   bool busy = false;
+
+  // 수정 일 : 2026-10-28 / 작업자 : 최현준
+  // 신규 소셜 회원은 기존 가입 화면에서 추가 정보를 입력합니다.
+  Future<void> socialLogin(String provider) async {
+    if (busy) return;
+    setState(() => busy = true);
+    // 이전 오류가 쌓여 같은 메시지만 반복되는 것처럼 보이지 않게 합니다.
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    try {
+      final result = await ref.read(socialLoginProvider)(provider);
+      if (!mounted) return;
+      if (result['signup_required'] == true) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute<void>(
+            builder: (_) =>
+                RegisterPage(signupTicket: result['signup_ticket'] as String),
+          ),
+        );
+      } else {
+        acceptMemberSession(ref, result);
+      }
+    } on SocialLoginException catch (error) {
+      if (mounted) showMessage(context, error.message);
+    } on ApiException catch (error) {
+      if (mounted) {
+        showMessage(
+          context,
+          '${SocialLoginService.labels[provider]} 서버 오류 (${error.statusCode}): ${error.message}',
+        );
+      }
+    } on TimeoutException {
+      if (mounted) {
+        showMessage(
+          context,
+          '${SocialLoginService.labels[provider]} 서버 응답 시간이 초과되었습니다. 다시 시도해 주세요.',
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        showMessage(
+          context,
+          '${SocialLoginService.labels[provider]} 로그인 응답 또는 연결을 확인할 수 없습니다. 다시 시도해 주세요.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   @override
   void dispose() {
     id.dispose();
@@ -28,6 +84,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   }
 
   Future<void> login() async {
+    if (busy) return;
     if (!form.currentState!.validate()) {
       return;
     }
@@ -42,16 +99,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       if (!mounted) {
         return;
       }
-      final available = (result['preferred_stocks'] as List)
-          .map((v) => int.tryParse('$v'))
-          .whereType<int>()
-          .where(sports.containsKey)
-          .toList();
-      if (available.isEmpty) {
-        throw Exception('가입 종목 정보를 확인할 수 없습니다.');
-      }
-      ref.read(sportProvider.notifier).select(available.first);
-      ref.read(sessionProvider.notifier).signIn(result);
+      acceptMemberSession(ref, result);
     } catch (error) {
       if (mounted) {
         showMessage(context, error);
@@ -126,6 +174,42 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           ),
                     child: const Text('처음이신가요? 회원가입'),
                   ),
+                  const Divider(height: 32),
+                  const Center(child: Text('간편 로그인')),
+                  const SizedBox(height: 12),
+                  // 수정 일 : 2026-10-28 / 작업자 : 최현준
+                  // 제공된 원본 비율을 유지하며 이미지 탭은 기존 인증 동작에 연결합니다.
+                  for (final provider in const {
+                    'google': (
+                      'Google',
+                      'assets/images/Theme=Light, Show text=Yes, Shape=Square, Platform=Android+Web@4x.png',
+                    ),
+                    'kakao': ('카카오', 'assets/images/kakao_login_en_medium.png'),
+                    'naver': (
+                      '네이버',
+                      'assets/images/NAVER_login_Light_KR_green_narrow_H56.png',
+                    ),
+                  }.entries)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: TextButton(
+                        key: ValueKey('social-${provider.key}'),
+                        style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                        onPressed: busy
+                            ? null
+                            : () => socialLogin(provider.key),
+                        child: Opacity(
+                          opacity: busy ? 0.5 : 1,
+                          child: Image.asset(
+                            provider.value.$2,
+                            height: 56,
+                            width: double.infinity,
+                            fit: BoxFit.contain,
+                            semanticLabel: '${provider.value.$1}로 계속하기',
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -136,3 +220,4 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   );
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-28 / 작업자 : 최현준

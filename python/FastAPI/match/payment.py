@@ -12,7 +12,7 @@ import pymysql
 from fastapi import APIRouter, Body, HTTPException, status
 
 from ..database import connect
-from .reservation_status import RESERVATION_RENTAL, is_canceled
+from .reservation_status import RESERVATION_MATCH, RESERVATION_RENTAL, is_canceled
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -51,7 +51,8 @@ def calculate_payment_amount(g_price: object, g_num: object) -> int:
 )
 def create_payment(
     r_seq: Annotated[int, Body(gt=0, description="결제할 reservation 테이블의 예약 번호")],
-    c_id_seq: Annotated[str, Body(min_length=4, max_length=45, description="결제를 요청한 회원의 customer FK")],
+    # 수정 일 : 2026-10-28 / 작업자 : 최현준 — 소셜 PK를 포함해 customer FK의 실제 길이와 일치시킵니다.
+    c_id_seq: Annotated[str, Body(min_length=4, max_length=50, description="결제를 요청한 회원의 customer FK (최대 50자)")],
     p_method: Annotated[PaymentMethod, Body(description="카드 결제 등 선택한 결제 수단 문자열")],
 ) -> dict:
     """예약일·구장 가격을 사용해 단일 결제 데이터를 생성합니다.
@@ -106,7 +107,8 @@ def create_payment(
             #   실력매칭(1) : 구장 이용금액 ÷ 수용인원 (1인 금액)
             #   구장대여(2) : 시간대 전체를 빌리므로 구장 이용금액 전체 (수용인원 1로 나눔)
             #   값이 없으면 DB 기본값과 같은 1(실력매칭)로 봄
-            if reservation.get("reservation_category", 1) == RESERVATION_RENTAL:
+            # 수정 일 : 2026-10-28 / 작업자 : 최현준 — DB VARCHAR와 문자열 상수로 비교합니다.
+            if reservation.get("reservation_category", RESERVATION_MATCH) == RESERVATION_RENTAL:
                 p_amount = calculate_payment_amount(reservation["g_price"], 1)
             else:
                 p_amount = calculate_payment_amount(reservation["g_price"], reservation["g_num"])
@@ -155,3 +157,5 @@ def create_payment(
             connection.close()
 
 # 최종 수정 일 : 2026-10-26 / 작업자 : 양태건 / 수정자 : 신현진 (구장대여 결제 금액)
+# 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (소셜 회원 ID 입력 길이 DB 정합성 적용)
+# 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (문자열 예약 분류에 따른 대여 총액 계산)

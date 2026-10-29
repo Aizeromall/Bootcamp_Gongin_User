@@ -1,5 +1,53 @@
 # bootcamp_project_gongin_admin_app
 
+## GitHub 공유 시 제외하는 로컬 설정
+
+실제 `.env`, `config/social.local.json`, `ios/Flutter/Social.local.xcconfig`, `Signing.local.xcconfig`, 서비스 계정 JSON, `google-services.json`, `GoogleService-Info.plist`, `lib/firebase_options.dart`는 업로드하지 않습니다. 새 환경은 `.env.example`과 `config/social.example.json`, `ios/Flutter/Social.example.xcconfig`를 참고하고, Firebase 콘솔/FlutterFire 설정으로 본인 프로젝트의 플랫폼 설정 파일과 `firebase_options.dart`를 생성해야 합니다. 생성 전에는 Firebase import 때문에 새 체크아웃의 Flutter 빌드가 실패할 수 있습니다. 비밀값을 소스나 PR 본문에 붙이지 마세요. 공유 정책 정리: 2026-10-28.
+
+IDE 기본 실행 설정(2026-10-28 / 양태건): 실행 구성 `공IN 회원앱 (로컬 설정)`은 `config/social.local.json`을 자동으로 읽습니다. 기기를 선택해 F5로 실행하세요. 해당 파일은 Git 제외 대상이며 다른 개발자는 `config/social.example.json`을 참고해 본인 서버 주소·모바일 SDK 키로 작성해야 합니다. 일반 `flutter run` 명령에는 여전히 `--dart-define-from-file=config/social.local.json` 옵션이 필요합니다. FastAPI는 앱과 별도 서버이며 이미 실행 중인 서버를 중복 시작하지 않습니다. 모바일 키·iOS 콜백 설정이 누락되면 간편 로그인은 안내 후 차단됩니다. 서버 `.env` 전체나 서버 비밀키를 앱으로 복사하지 마세요.
+
+간편 로그인 종료 방어 수정(2026-10-28 / 최현준): SDK 호출 전 iOS 앱의 실제 Client ID·콜백 스킴과 공급자별 키를 확인합니다. 누락·취소·SDK 오류·서버 오류 안내를 분리하고 재시도·중복 호출을 점검했습니다. Flutter 가상 테스트 61개와 수정 Dart 정적 검사가 통과했으며, 실제 공급자 인증은 별도 검증이 필요합니다.
+위 수정의 iOS 시뮬레이터 빌드도 통과했습니다. Swift 변경이 포함되어 실물폰에는 앱 전체 재빌드·재설치가 필요합니다.
+
+실물 iPhone 테스트 서명(2026-10-28 / 최현준): `ios/Flutter/Signing.local.xcconfig`의 `DEVELOPMENT_TEAM`과 자동 서명을 사용합니다. 해당 파일은 Git 제외 대상이며 각 개발자는 본인 팀으로 설정합니다. 공용 Bundle ID와 Firebase 설정은 변경하지 않았습니다.
+
+## 모바일 간편 로그인·푸시 연결 (작업자: 최현준 / 작업일: 2026-10-28)
+
+2026-10-28 iOS 호환 조합: `firebase_core 4.15.2`, `firebase_auth 6.7.1`, `firebase_messaging 16.7.1`로 고정하고 `google_sign_in 7.2.0`은 유지했습니다.
+pub.dev 전체 최신은 Firebase 5.1.0/7.0.1/17.0.1이지만 Google iOS 플러그인의 네이티브 9.x 요구와 충돌하므로, Firebase iOS SDK 12.19.3을 쓰는 최신 이전 메이저 패치를 사용합니다. 실제 계정 인증/푸시 수신은 빌드 검증과 별개입니다. 작업자: 최현준.
+검증: Flutter 48개 테스트·변경 관련 정적 검사 통과, iOS 시뮬레이터 빌드 및 iPhone 18 Pro(iOS 27.0) 시작 화면 표시 확인. SPM은 Firebase 12.19.3 / GoogleSignIn 9.2.0 / GTMSessionFetcher 3.5.0으로 해결됐습니다. 네이버 SDK의 CocoaPods 병행 경고와 미설정 iOS APNs entitlement 경고는 남아 있으며, 실제 간편 로그인·푸시는 실행하지 않았습니다.
+
+로그인 아래 Google·카카오·네이버 버튼과 기존 가입 화면을 연결했습니다.
+Android FCM 권한·기기 등록/갱신/해제·수신 안내·기존 화면 이동 및 모든 가입 종목 수신을 구현했습니다.
+Backend mock 205개, Flutter 48개가 통과했습니다. 실제 로그인·알림 수신은 콘솔/기기 설정 후 검증해야 합니다.
+Android debug APK 빌드도 성공했습니다.
+2026-10-28 로그인 버튼을 `assets/images/`의 공급자별 이미지로 연결했습니다. 인증 로직은 유지하고 잘못된 에셋 경로를 수정했습니다. 작업자: 최현준.
+[설정 파일·실행 방법·미검증 사항](docs/mobile_auth_notification_setup.md)을 확인하세요.
+
+## Backend 전체 검증 (작업자: 최현준 / 작업일: 2026-10-28)
+
+후속 승인 조치: main에 `/report/insert`, `/report/list`를 연결하고 일반 회원가입의
+전화번호·성별·팀명 최대 길이를 실제 DB 기준 20/10/50자로 수정했습니다.
+예약 구분이 빈 더미 데이터는 건너뛰고 DB를 변경하지 않았습니다.
+추가 승인으로 예약·결제·대여 API의 회원 ID 제한을 50자로 맞췄습니다. 예약 분류는 문자열 `"1"`(실력 매칭)·`"2"`(구장 대여)로 통일했습니다. 백엔드 mock 테스트 201개가 통과했으며, 빈 더미 값과 실제 DB 데이터는 변경하지 않았습니다.
+
+PR #1~#26과 현재 `.env` 연결 DB 구조를 대조했습니다. 기존 자동 테스트 187개는 통과했으나,
+실제 varchar 자료형을 반영한 추가 mock 검증에서 대여·결제 분기 오류, 소셜 ID 길이 제한,
+신고 router 미등록 및 입력 길이/DB 차이를 확인했습니다. **전체 정상 판정은 아닙니다.**
+[검증 범위·PR 대응·수정 필요 사항](docs/backend_audit_20261028.md)에 상세 기록했습니다.
+실제 DB 쓰기·외부 인증·푸시 발송 및 Backend 수정은 진행하지 않았습니다.
+
+## 알림 Backend 1차 (작업자: 최현준 / 최초 작업 일·최종 수정 일: 2026-10-28)
+
+채팅 수신자 알림, 개인 실력 매치 성사, 경기 시작 10분 전·10분 후 알림을 구현했습니다.
+10분 후는 예약별 최신 출석값이 정확히 0인 회원만 대상이며 NULL·기록 없음은 제외합니다.
+업무 저장과 DB 이벤트 기록을 같은 트랜잭션으로 처리하고, 별도 worker가 활성 Android 기기로 FCM을 보냅니다.
+본인 발송 상태는 JWT 인증 후 `GET /notifications/events`로 조회합니다.
+수신은 현재 등록된 정확한 종목별 `c_id_seq` 기준이며 팀 매칭·iOS·웹·Front 연결은 이번 범위 밖입니다.
+main 서버 실행만으로 발송하지 않습니다. [알림 실행·검증 안내](docs/notification_phase1.md)를 확인하세요.
+신규 알림 모의 테스트 19개 포함 총 77개와 정적 검사·Swagger/health 확인을 통과했습니다.
+실제 DB는 읽기 전용 점검만 수행했고 실제 푸시/DB 테스트 데이터는 생성하지 않았습니다.
+
 ## 전체 회원 목업 적용 (2026-10-28 / 작업자 : 양태건)
 
 시작·로그인·2단계 회원가입, 구장 상세·개인 예약·전체 대여·결제, 예약 상세,
@@ -25,6 +73,43 @@ Python과 실제 DB는 변경하지 않았습니다.
 Mock HTTP·WebSocket 검증은 실제 서버·DB·기기 검증과 구분합니다. 실제 DB를 변경하는 테스트는 실행하지 않습니다.
 
 
+## 간편 로그인 Backend (작업자: 최현준 / 최초 작업 일·최종 수정 일: 2026-10-28)
+
+`.env.example`에 Firebase Google·카카오·네이버 로그인 설정 항목을 추가했습니다.
+2026-10-28 최소 설정 정리: Google은 기존 Firebase 2개, 카카오·네이버는 서버 REST용 각 3개만 유지합니다.
+별도 Google Client ID 환경변수와 카카오 모바일·웹 SDK 키는 제거했으며 JWT·DB 설정은 유지합니다.
+발급 위치, 공개/비밀 설정 구분, 플랫폼별 준비 및 미구현 범위는
+[간편 로그인 설정 안내](docs/social_login_setup.md)를 참고하세요.
+Google·카카오·네이버를 별도 router로 구현했습니다. 기존 회원은 서비스 JWT를 발급하고,
+신규 회원은 일회용 가입 티켓으로 추가 정보를 입력해 종목별 customer 행을 생성합니다.
+PK는 `g_`/`k_`/`n_` + 전체 SHA-256의 URL-safe Base64 + `_01`~`_04`로 총 48자입니다.
+`c_login_type`을 저장하고 `c_pw`에는 `간편로그인_비밀번호미지원`, 레이팅에는 1500을 넣습니다.
+일반·채팅 비밀번호 로그인은 local 회원만 허용합니다. 새 클래스·자동 DB 변경은 없습니다.
+
+모의·회귀 테스트 총 56개, 정적 검사, main Swagger/health 검증을 통과했습니다.
+실제 공급자·DB 쓰기·실기기 로그인 및 Flutter 연결은 미검증/미구현입니다.
+현재 로그인 대기 상태는 단일 worker 메모리 기준이며 재시작 시 다시 인증해야 합니다.
+예약·결제·구장 대여 API의 회원 ID 제한은 사용자 승인으로 50자로 조정해 48자 소셜 PK를 허용합니다.
+Swagger 테스트 순서와 콜백 주소는 위 안내서에 정리했습니다.
+
+## Firebase SDK 연결 (작업자: 최현준 / 작업일: 2026-10-27)
+
+`gongin-4823a` 프로젝트에 Android·iOS·Web 앱을 연결합니다.
+기존 `firebase_core`, `firebase_messaging` 의존성을 사용하며 `main.dart`에서 플랫폼별
+`DefaultFirebaseOptions`로 Firebase 초기화 후 Riverpod 앱을 실행합니다.
+
+현재 앱 식별자(Android의 `com.example.bootcamp_project_gongin_admin_app`,
+iOS의 `com.example.bootcampProjectGonginAdminApp`)는 유지했습니다.
+SDK 설정 파일은 클라이언트 식별용이며 서비스 계정 키를 앱에 포함하면 안 됩니다.
+
+이번 범위는 SDK 연결입니다. 경기 시작 로컬 알림, 권한 요청, 회원별 FCM 토큰 등록·갱신,
+서버 발송 및 메시지 처리는 별도로 구현해야 합니다.
+iOS 푸시에는 Apple Developer의 APNs 키 등록과 Push Notifications/Background Modes 설정,
+Web 푸시에는 VAPID 키·서비스 워커·HTTPS 설정이 추가로 필요합니다.
+
+새 개발 환경에서 플랫폼 설정을 다시 내려받으려면 `flutterfire configure --project=gongin-4823a --platforms=android,ios,web`를 실행합니다.
+`android/app/google-services.json`은 기존 Git ignore 규칙에 따라 로컬에서 생성되므로 새 환경에서도 재생성이 필요합니다.
+공식 설정 안내: https://firebase.google.com/docs/flutter/setup
 
 ## 사용자 공지 조회 API (작업자: 최현준 / 작업일: 2026-10-27)
 
@@ -238,4 +323,53 @@ Swagger는 일반 HTTP API 테스트용이며 WebSocket은 별도 클라이언�
 
 ```bash
 python3 -m unittest discover -s python/tests -p test_chat.py -v
+```
+# 일반 로그인 JWT · FCM 기기 등록 (2026-10-27)
+
+작업자 : 최현준 / 최초 작업 일 : 2026-10-27 / 최종 수정 일 : 2026-10-27
+
+알림 Backend의 공통 인증·기기 등록 구동 방식을 문서화했습니다.
+새 Python 클래스 없이 함수와 router로 구현했으며 기존 SDK 연결 변경은 보존했습니다.
+
+- `/auth/login`의 기존 응답 필드를 유지하고 `access_token`, `token_type`, `expires_in`(1,800초),
+  `c_id_seq`, `member_ids`를 추가했습니다. 탈퇴한 회원은 제외하며 종목별 PK `_01`~`_04`만 정확히 조회합니다.
+- 프로젝트 루트 `.env`에 `AUTH_TOKEN_SECRET`을 32바이트 이상의 무작위 비밀값으로 설정해야 합니다.
+  비밀키는 Git에 올리지 말고, 운영 API 프로세스 간 동일하게 설정합니다. 없으면 로그인 발급은 503입니다.
+- 일반 로그인 JWT는 HS256·issuer·audience·필수 claim·만료를 검증합니다.
+  기존 채팅 전용 JWT는 유지하고 일반 로그인 JWT도 채팅 HTTP/WebSocket 인증에 사용할 수 있습니다.
+  일반 JWT로 채팅 접속 시 종목별 ID는 로그인 응답의 기본 `c_id_seq`입니다.
+- 기기 API는 일반 로그인 JWT만 허용합니다. Swagger의 Authorize에 발급받은 JWT를 입력합니다.
+  `POST /notifications/devices`에 아래 JSON을 보내며, `c_id_seq` 생략 시 로그인 기본 종목을 사용합니다.
+
+```json
+{"f_token": "Flutter에서 발급된 실제 FCM 토큰", "f_platform": "android", "c_id_seq": "member_01"}
+```
+
+플랫폼은 `android`, `ios`, `web` 중 하나입니다. `f_token`은 설명 문구가 아니라
+Flutter `FirebaseMessaging.instance.getToken()`의 실제 반환값이어야 합니다.
+앱은 로그인 후 토큰 등록 및 `onTokenRefresh` 발생 시 재등록을 호출해야 하며 Front 연결은 아직 미구현입니다.
+타인 ID는 403, 탈퇴 회원은 404, 입력 오류는 422, DB 오류는 500, 인증 설정 오류는 503으로 구분합니다.
+FCM 토큰은 응답이나 오류 로그에 출력하지 않습니다.
+
+- 로그아웃 **전에** `POST /notifications/devices/deactivate`에 `{"f_token":"실제 토큰"}`을 전송합니다.
+  본인 소유 기기만 비활성화하며 이미 해제된 토큰 요청도 안전하게 처리합니다.
+- 현재 DB의 `f_token` UNIQUE 구조에서는 기기 토큰 하나가 종목별 회원 PK 하나에 연결됩니다.
+  재등록은 해당 기기의 소유 연결을 갱신합니다. 여러 기기는 각자 등록할 수 있습니다.
+  같은 계정의 다른 종목 알림까지 기기로 전달할지는 사용자 선택 후 발송 단계에서 연결할 예정입니다.
+- 이번 구현은 **인증·기기 등록 단계**입니다. 경기·메시지 이벤트 생성, 예약 시간 감시 worker,
+  Firebase Admin 실제 발송, Front 자동 등록은 아직 연결하지 않았습니다.
+  다른 기존 API의 인증을 일괄 변경하거나 JWT 갱신·폐기 API를 추가하지 않았습니다.
+  JWT 유효기간은 30분이며 만료 후 재로그인이 필요합니다. 기기 해제는 JWT 자체를 폐기하지 않습니다.
+
+정적 검사: 변경 Python 파일 `compileall`, `git diff --check` 통과.
+가상 동적 검사: 신규 인증·기기 API 테스트 7개와 기존 채팅 회귀 테스트 31개 통과.
+실제 main 앱 TestClient에서 `/docs`, `/health` 200 및 알림 API OpenAPI 등록을 확인했습니다.
+DB 쓰기·실제 FCM 발송은 하지 않았습니다. TestClient에서 기존 httpx 관련 지원 중단 예고 경고가 있으며,
+테스트 실패는 아닙니다.
+
+```bash
+python3 -m pip install -r python/requirements-notification.txt
+python3 -m unittest discover -s python/tests -p test_notification_auth.py -v
+python3 -m unittest discover -s python/tests -p test_chat.py -v
+python3 python/FastAPI/main.py
 ```

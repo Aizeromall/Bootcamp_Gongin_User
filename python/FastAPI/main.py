@@ -17,6 +17,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from FastAPI.auth import auth_router
     from FastAPI.chat import chat_router
+    from FastAPI.notification import notification_router
     from FastAPI.team_create.team import router as team_router
     from FastAPI.announce import announce_router
     from FastAPI.board.board import router as board_router
@@ -38,6 +39,7 @@ else:
     # `python -m FastAPI.main` 모듈 실행에서는 일반 상대 import를 사용합니다.
     from .auth import auth_router
     from .chat import chat_router
+    from .notification import notification_router
     from .team_create.team import router as team_router
     from .announce import announce_router
     from .board.board import router as board_router
@@ -128,6 +130,17 @@ app.include_router(team_match_router)
 # 게시글·댓글 router를 연결하여 Swagger와 앱에서 /board 경로로 사용합니다.
 app.include_router(board_router, prefix="/board", tags=["Board"])
 
+# ************************
+# 버그 확인 일 : 2026-10-28 / 작업자 : 최현준
+# 1. 버그 발생 위치 : main.py의 신고 router 등록 부분
+# 2. 버그 내용 : import만 있어 /report/insert, /report/list가 Swagger와 서버에 미등록
+# 3. 디버깅 내용 : 기존 report_router를 /report prefix로 연결
+# 4. 테스트 사항 : OpenAPI 경로·필수 입력 누락 422·다른 router 유지 확인
+# 5. 결과 및 추후 보완 사항 : source router는 유지하고 진입점 누락만 복구, 실제 신고 저장은 미검증
+# ************************
+# 신고 router: 회원 신고 작성과 내 신고 내역 조회를 /report 하위에 연결합니다.
+app.include_router(report_router, prefix="/report")
+
 # 수정 일 : 2026-10-27 / 작업자 : 양태건
 # 팀 개설·최초 팀장 등록 API를 /team 하위에 연결합니다.
 app.include_router(team_router, prefix="/team", tags=["Team"])
@@ -140,6 +153,8 @@ app.include_router(appeal_router, prefix="/appeal")
 # 수정 일 : 2026-10-27 / 작업자 : 양태건
 # 채팅 인증·방 관리와 WebSocket 실시간 메시지를 연결합니다.
 app.include_router(chat_router)
+# 알림 기기 router: 일반 로그인 JWT로 본인 FCM 토큰만 등록·해제합니다.
+app.include_router(notification_router)
 
 
 if __name__ == "__main__":
@@ -160,3 +175,5 @@ if __name__ == "__main__":
 # 최종 수정 일 : 2026-10-27 / 작업자 : 김병재 (제재 API 라우터 등록)
 # 이전 수정 일 : 2026-10-26 / 작업자 : 양태건 (취소 API DELETE CORS 허용) / 수정자 : 신현진 (ground router, team_match router 추가)
 # 최종 수정 일 : 2026-10-27 / 수정자 : 최현준 (공지·게시판 router 동시 유지 및 main 충돌 해결)
+# 최종 수정 일 : 2026-10-27 / 작업자 : 최현준 (알림 기기 router 연결)
+# 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (신고 router 진입점 복구)

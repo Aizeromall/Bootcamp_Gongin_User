@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../vm/member_state.dart';
+import '../../vm/notification_state.dart';
 import '../ground/grounds_page.dart';
 import '../history/history_page.dart';
 import '../inquiry/inquiry_page.dart';
@@ -117,6 +118,45 @@ class _MemberHomeState extends ConsumerState<MemberHome> {
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
         actions: [
+          IconButton(
+            tooltip: '푸시 알림 설정',
+            icon: const Icon(Icons.notifications_active_outlined),
+            onPressed: () => showModalBottomSheet<void>(
+              context: context,
+              builder: (context) => Consumer(
+                builder: (context, ref, _) => SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Text(
+                          '푸시 알림',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text('${ref.watch(notificationProvider)['status']}'),
+                        const Text(
+                          '채팅 메시지 · 매치 성사 · 경기 시작 10분 전 · 시작 10분 후 미출석 안내',
+                        ),
+                        const SizedBox(height: 12),
+                        const Text('알림이 차단된 경우 Android 설정에서 앱 알림을 허용해 주세요.'),
+                        TextButton(
+                          onPressed: () =>
+                              ref.read(notificationProvider.notifier).retry(),
+                          child: const Text('권한 확인 및 다시 연결'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
           if (tab != 0)
             Padding(
               padding: const EdgeInsets.only(right: 8),
@@ -213,3 +253,4 @@ class _MemberHomeState extends ConsumerState<MemberHome> {
   }
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (푸시 연결 상태 및 재시도)
