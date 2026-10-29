@@ -1,20 +1,17 @@
 # 2026-10-27
 # 작업자 : 양태건
 
-"""팀 가입·탈퇴 API.
-
-POST /team/apply/{t_id}                     가입 신청 즉시 가입 완료
-DELETE /team/leave/{t_id}?c_id_seq=회원ID   본인 팀 탈퇴
-c_category='가입'/'탈퇴', tr_date=해당 처리 시각으로 저장합니다.
-(c_id_seq, t_id)가 UNIQUE이므로 재가입 시 기존 행을 갱신하며 가장 최근 상태·날짜를 보관합니다.
-승인 대기·거절 기능은 없으며 기존 빈 값·가입일·탈퇴일도 읽기 호환합니다.
-새로 저장하거나 상태를 변경할 때는 가입·탈퇴만 사용합니다.
+"""팀 신청은 tr_state='대기', 승인 후에만 c_category='가입'과 회원 소속을 반영합니다.
+tr_date는 현재 상태의 처리 시각이며 기존 빈 tr_state 가입 기록은 호환합니다.
+(c_id_seq, t_id)별 최근 상태만 보관하며 게시글별 신청 이력은 저장하지 않습니다.
 """
 
 import logging
 
 import pymysql
 from fastapi import APIRouter, HTTPException, Path, Query, status
+from typing import Optional
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..database import connect
@@ -25,6 +22,32 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+# 수정 일 : 2026-10-28 / 작업자 : 양태건
+# 빈 상태는 기존 가입 데이터만 호환하며 대기·거절을 현재 팀원에서 제외합니다.
+def active_registration(alias=""):
+    prefix = alias + "." if alias else ""
+    return (f"COALESCE({prefix}c_category, '') IN ('', '가입', '가입일') "
+            f"AND COALESCE({prefix}tr_state, '') IN ('', '승인')")
+
+
+def recruitment_team(cursor, bulletin_seq, lock=False):
+    """모집글 작성자의 실제 가입 팀을 찾습니다. 게시글 상세 조회 수는 변경하지 않습니다."""
+    cursor.execute(
+        f"""SELECT t.t_id, t.t_name, tc.c_category, COALESCE(
+            (SELECT cc.t_c_captain FROM team_captain_change cc WHERE cc.t_id = t.t_id
+             ORDER BY cc.t_c_date DESC, cc.t_c_seq DESC LIMIT 1), tc.c_id_seq) AS captain_id
+        FROM board_a_write b INNER JOIN t_register tr ON tr.c_id_seq = b.c_id_seq
+        INNER JOIN team t ON t.t_id = tr.t_id INNER JOIN team_create tc ON tc.t_id = t.t_id
+        WHERE b.bulletin_seq = %s AND b.comment_seq = 0 AND b.board_category = '팀원모집'
+          AND b.comment_delete_state = 0 AND {active_registration('tr')}
+        ORDER BY t.t_id LIMIT 1 {"FOR UPDATE" if lock else ""}""", (bulletin_seq,),
+    )
+    row = cursor.fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="모집 게시글에 연결된 팀이 없습니다.")
+    return row
+
+
 # 수정 일 : 2026-10-27 / 작업자 : 양태건
 # 날짜와 카테고리는 회원이 입력하지 않고 서버에서 가입·탈퇴 처리에 따라 정합니다.
 class ApplyTeamRequest(BaseModel):
@@ -33,10 +56,11 @@ class ApplyTeamRequest(BaseModel):
         json_schema_extra={"example": {"c_id_seq": "member_01"}},
     )
     c_id_seq: str = Field(min_length=1, max_length=50, description="가입할 종목별 회원 ID")
+    bulletin_seq: Optional[int] = Field(default=None, gt=0, description="모집 게시글 번호")
 
 
 # 가입 완료: 회원·팀을 잠그고 중복 소속을 확인한 뒤 가입 기록과 회원 소속을 함께 저장합니다.
-@router.post("/apply/{t_id}", status_code=status.HTTP_201_CREATED, summary="팀 가입 신청 및 가입 완료")
+@router.post("/apply/{t_id}", status_code=status.HTTP_201_CREATED, summary="팀 가입 신청 (팀장 승인 대기)")
 def apply_team(payload: ApplyTeamRequest, t_id: int = Path(gt=0)):
     connection = None
     try:
@@ -58,44 +82,37 @@ def apply_team(payload: ApplyTeamRequest, t_id: int = Path(gt=0)):
             if team["c_category"] == "폐지일":
                 raise HTTPException(status_code=409, detail="폐지된 팀에는 가입할 수 없습니다.")
 
-            # 같은 종목 회원 ID는 한 팀에만 소속됩니다. 탈퇴 이력은 현재 소속에서 제외합니다.
+            # 수정 일 : 2026-10-28 / 작업자 : 양태건
+            # 모집글과 대상 팀의 연결을 서버에서 확인합니다. 일반 팀 화면 신청도 대기로 처리합니다.
+            if payload.bulletin_seq is not None:
+                linked = recruitment_team(cursor, payload.bulletin_seq, lock=True)
+                if linked["t_id"] != t_id:
+                    raise HTTPException(status_code=409, detail="모집 게시글의 팀이 일치하지 않습니다.")
             cursor.execute(
-                """SELECT t_id FROM t_register WHERE c_id_seq = %s
-                   AND COALESCE(c_category, '') IN ('', '가입', '가입일') LIMIT 1 FOR UPDATE""",
+                f"SELECT t_id FROM t_register WHERE c_id_seq = %s AND {active_registration()} LIMIT 1 FOR UPDATE",
                 (payload.c_id_seq,),
             )
-            membership = cursor.fetchone()
-            if membership is not None:
-                message = "이미 가입한 팀입니다." if membership["t_id"] == t_id else "이미 다른 팀에 소속되어 있습니다."
-                raise HTTPException(status_code=409, detail=message)
-
-            # UNIQUE(c_id_seq, t_id) 때문에 탈퇴했던 팀에 재가입할 때는 기존 행을 사용합니다.
-            cursor.execute(
-                "SELECT tr_seq, c_category FROM t_register WHERE c_id_seq = %s AND t_id = %s FOR UPDATE",
-                (payload.c_id_seq, t_id),
-            )
+            if cursor.fetchone() is not None:
+                raise HTTPException(status_code=409, detail="이미 소속된 팀이 있습니다.")
+            cursor.execute("SELECT tr_seq, tr_state, c_category FROM t_register WHERE c_id_seq = %s AND t_id = %s FOR UPDATE",
+                           (payload.c_id_seq, t_id))
             previous = cursor.fetchone()
+            if previous and previous.get("tr_state") == "대기":
+                raise HTTPException(status_code=409, detail="이미 가입 승인 대기 중입니다.")
+            if previous and (previous.get("tr_state") or "") not in ("", "승인", "거절", "탈퇴"):
+                raise HTTPException(status_code=409, detail="기존 신청 상태를 확인해 주세요.")
+            if previous and (previous.get("c_category") or "") not in ("", "가입", "가입일", "탈퇴", "탈퇴일"):
+                raise HTTPException(status_code=409, detail="기존 가입 상태를 확인해 주세요.")
             if previous is None:
-                cursor.execute(
-                    """INSERT INTO t_register (c_id_seq, t_id, tr_date, c_category)
-                       VALUES (%s, %s, NOW(), '가입')""", (payload.c_id_seq, t_id),
-                )
+                cursor.execute("""INSERT INTO t_register (c_id_seq, t_id, tr_date, c_category, tr_state)
+                                  VALUES (%s, %s, NOW(), '', '대기')""", (payload.c_id_seq, t_id))
             else:
-                if previous["c_category"] not in ("탈퇴", "탈퇴일"):
-                    raise HTTPException(status_code=409, detail="기존 가입 상태를 확인해 주세요.")
-                cursor.execute(
-                    """UPDATE t_register SET c_category = '가입', tr_date = NOW()
-                       WHERE tr_seq = %s AND c_id_seq = %s AND t_id = %s""",
-                    (previous["tr_seq"], payload.c_id_seq, t_id),
-                )
-            cursor.execute("UPDATE customer SET c_team = %s WHERE c_id_seq = %s", (team["t_name"], payload.c_id_seq))
-            cursor.execute(
-                "SELECT tr_seq, tr_date, c_category FROM t_register WHERE c_id_seq = %s AND t_id = %s",
-                (payload.c_id_seq, t_id),
-            )
+                cursor.execute("""UPDATE t_register SET c_category = '', tr_state = '대기', tr_date = NOW()
+                                  WHERE tr_seq = %s""", (previous["tr_seq"],))
+            # 신청만으로 customer.c_team은 변경하지 않습니다.
+            cursor.execute("SELECT tr_seq, tr_date, c_category, tr_state FROM t_register WHERE c_id_seq = %s AND t_id = %s",
+                           (payload.c_id_seq, t_id))
             joined = cursor.fetchone()
-            if joined is None:
-                raise RuntimeError("가입 기록을 확인하지 못했습니다.")
         connection.commit()
         return {"result": "OK", "t_id": t_id, "t_name": team["t_name"], "c_id_seq": payload.c_id_seq, **joined}
     except HTTPException:
@@ -139,13 +156,13 @@ def leave_team(t_id: int = Path(gt=0), c_id_seq: str = Query(min_length=1, max_l
             if team is None:
                 raise HTTPException(status_code=404, detail="존재하지 않는 팀입니다.")
             cursor.execute(
-                "SELECT tr_seq, c_category FROM t_register WHERE c_id_seq = %s AND t_id = %s FOR UPDATE",
+                "SELECT tr_seq, c_category, tr_state FROM t_register WHERE c_id_seq = %s AND t_id = %s FOR UPDATE",
                 (c_id_seq, t_id),
             )
             membership = cursor.fetchone()
             if membership is None:
                 raise HTTPException(status_code=404, detail="해당 팀에 가입한 기록이 없습니다.")
-            if (membership["c_category"] or "") not in ("", "가입", "가입일"):
+            if (membership["c_category"] or "") not in ("", "가입", "가입일") or (membership.get("tr_state") or "") not in ("", "승인"):
                 raise HTTPException(status_code=409, detail="이미 탈퇴했거나 가입 중인 상태가 아닙니다.")
             cursor.execute(
                 """SELECT t_c_captain FROM team_captain_change WHERE t_id = %s
@@ -155,7 +172,7 @@ def leave_team(t_id: int = Path(gt=0), c_id_seq: str = Query(min_length=1, max_l
             if (captain["t_c_captain"] if captain else team["c_id_seq"]) == c_id_seq:
                 raise HTTPException(status_code=409, detail="현재 팀장은 팀장 변경 또는 팀 폐지 후 탈퇴해 주세요.")
             cursor.execute(
-                """UPDATE t_register SET c_category = '탈퇴', tr_date = NOW()
+                """UPDATE t_register SET c_category = '탈퇴', tr_state = '탈퇴', tr_date = NOW()
                    WHERE tr_seq = %s AND c_id_seq = %s AND t_id = %s""",
                 (membership["tr_seq"], c_id_seq, t_id),
             )
@@ -191,4 +208,4 @@ def leave_team(t_id: int = Path(gt=0), c_id_seq: str = Query(min_length=1, max_l
             connection.close()
 
 
-# 최종 수정 일 : 2026-10-27 / 작업자 : 양태건
+# 최종 수정 일 : 2026-10-28 / 작업자 : 양태건

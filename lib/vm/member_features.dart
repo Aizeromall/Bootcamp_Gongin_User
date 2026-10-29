@@ -12,8 +12,16 @@ ApiQuery apiQuery(String path, [Map<String, String> query = const {}]) => (
   query: Uri(queryParameters: query.isEmpty ? null : query).query,
 );
 
+// 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 팀 신청 변경은 팀·매칭 조회만 갱신하여 게시글 상세 조회 수를 다시 증가시키지 않습니다.
+final teamDataRefreshProvider = Provider<Object>((ref) => Object());
+
 final apiDocumentProvider = FutureProvider.autoDispose
     .family<Map<String, dynamic>, ApiQuery>((ref, query) {
+      if (query.path.startsWith('/team/') ||
+          query.path.startsWith('/team_match/')) {
+        ref.watch(teamDataRefreshProvider);
+      }
       ref.watch(sessionProvider);
       ref.watch(memberIdProvider);
       return ref

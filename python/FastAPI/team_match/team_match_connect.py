@@ -560,7 +560,7 @@ def select_team_match_requests(
                 if team:
                     # 수정 일 : 2026-10-27 / 작업자 : 양태건
                     # 팀원 수에서 탈퇴 이력을 제외합니다.
-                    cursor.execute("SELECT COUNT(*) AS n FROM t_register WHERE t_id = %s AND COALESCE(c_category, '') IN ('', '가입', '가입일')", (team["t_id"],))
+                    cursor.execute("SELECT COUNT(*) AS n FROM t_register WHERE t_id = %s AND COALESCE(c_category, '') IN ('', '가입', '가입일') AND COALESCE(tr_state, '') IN ('', '승인')", (team["t_id"],))
                     member_count = cursor.fetchone()["n"]
                 requests.append({
                     "comment_seq": comment["comment_seq"],          # 신청 댓글 번호 (수락/거절할 때 사용)
@@ -718,3 +718,7 @@ def reject_team_match_request(
     return answer_team_match_request(c_id_seq, bulletin_seq, comment_seq, False)
 
 # 최종 수정 일 : 2026-10-27 / 작업자 : 양태건
+
+# 수정 일 : 2026-10-28 / 작업자 : 양태건
+# 팀원 수는 승인된 가입자와 기존 빈 상태만 집계합니다.
+# 최종 수정 일 : 2026-10-28 / 작업자 : 양태건

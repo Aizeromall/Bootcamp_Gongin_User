@@ -8,6 +8,7 @@ import '../../vm/member_features.dart';
 import '../../vm/chat_state.dart';
 import '../../service/member_api.dart';
 import '../shared/ui.dart';
+import '../shared/member_style.dart';
 import 'chat_room_page.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
@@ -145,10 +146,33 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       child: Text('참여 중인 채팅방이 없습니다.'),
                     ),
                   for (final room in apiRows(data))
-                    Card(
+                    // 수정 일 : 2026-10-28 / 작업자 : 양태건
+                    // 마지막 메시지·읽음 수는 API에 없으므로 방 이름과 실제 참여 권한만 표시합니다.
+                    Container(
+                      decoration: const BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(color: MemberStyle.line),
+                        ),
+                      ),
                       child: ListTile(
-                        leading: const Icon(Icons.forum_outlined),
-                        title: Text('${room['me_name']}'),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 10,
+                          horizontal: 0,
+                        ),
+                        leading: const CircleAvatar(
+                          backgroundColor: MemberStyle.greenSurface,
+                          child: Icon(
+                            Icons.forum_outlined,
+                            color: MemberStyle.green,
+                          ),
+                        ),
+                        title: Text(
+                          '${room['me_name']}',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
                         subtitle: Text(
                           room['owner_id'] == ref.watch(memberIdProvider)
                               ? '내가 만든 방'
@@ -191,4 +215,4 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     ]);
   }
 }
-// 최종 수정 일 : 2026-10-27 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-28 / 작업자 : 양태건

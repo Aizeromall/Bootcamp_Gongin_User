@@ -39,7 +39,9 @@ class ResultPage extends ConsumerWidget {
                     padding: const EdgeInsets.all(24),
                     margin: const EdgeInsets.only(bottom: 22),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF172541),
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF172541), Color(0xFF253D66)],
+                      ),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Column(
@@ -49,6 +51,10 @@ class ResultPage extends ConsumerWidget {
                           style: const TextStyle(color: Colors.white),
                         ),
                         const SizedBox(height: 16),
+                        const Text(
+                          '나의 경기 점수',
+                          style: TextStyle(color: Colors.white70, fontSize: 12),
+                        ),
                         Text(
                           '${data['c_r_r_score'] ?? '미기록'}',
                           style: const TextStyle(
