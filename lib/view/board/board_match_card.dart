@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../vm/member_state.dart';
 import '../../vm/board_state.dart';
+import '../../vm/member_features.dart';
 import '../shared/member_style.dart';
 import '../shared/ui.dart';
 import 'board_widgets.dart';
@@ -22,6 +23,7 @@ class _BoardMatchCardState extends ConsumerState<BoardMatchCard> {
   bool busy = false;
   Future<void> act(String path, String id, {int? comment}) async {
     if (busy) return;
+    final session = ref.read(sessionProvider);
     setState(() => busy = true);
     try {
       final ok = await showDialog<bool>(
@@ -31,7 +33,7 @@ class _BoardMatchCardState extends ConsumerState<BoardMatchCard> {
             path.endsWith('request')
                 ? '매칭 신청'
                 : path.endsWith('accept')
-                ? '매칭 수락'
+                ? '매칭 승인'
                 : '매칭 거절',
           ),
           content: const Text('진행하시겠어요?'),
@@ -47,7 +49,11 @@ class _BoardMatchCardState extends ConsumerState<BoardMatchCard> {
           ],
         ),
       );
-      if (ok != true || !mounted) return;
+      if (ok != true ||
+          !mounted ||
+          !identical(session, ref.read(sessionProvider))) {
+        return;
+      }
       await ref
           .read(memberApiProvider)
           .request(
@@ -58,11 +64,11 @@ class _BoardMatchCardState extends ConsumerState<BoardMatchCard> {
               'comment_seq': ?comment,
             },
           );
-      if (!mounted) return;
+      if (!mounted || !identical(session, ref.read(sessionProvider))) return;
       refreshBoardThread(ref, widget.seq);
       showMessage(context, '매칭 정보가 변경되었습니다.');
     } catch (error) {
-      if (mounted) {
+      if (mounted && identical(session, ref.read(sessionProvider))) {
         refreshBoardThread(ref, widget.seq);
         showMessage(context, error);
       }
@@ -95,6 +101,12 @@ class _BoardMatchCardState extends ConsumerState<BoardMatchCard> {
           if (info == null) return const SizedBox.shrink();
           final reservation = info['reservation'] as Map<String, dynamic>;
           final match = info['match'] as Map<String, dynamic>?;
+          final post = ref
+              .watch(
+                apiDocumentProvider(apiQuery('/board/select/${widget.seq}')),
+              )
+              .asData
+              ?.value;
           final id = info['member_id'] as String?;
           final own = info['own'] == true;
           final matched =
@@ -142,14 +154,14 @@ class _BoardMatchCardState extends ConsumerState<BoardMatchCard> {
                             ),
                           ),
                           Text(
-                            '${reservation['g_name'] ?? ''}',
+                            '${post?['event_category'] ?? ''} · ${reservation['r_date'] ?? ''}',
                             style: const TextStyle(
                               fontSize: 12,
                               color: MemberStyle.muted,
                             ),
                           ),
                           Text(
-                            '${reservation['r_date'] ?? ''} · ${reservation['rs_time'] ?? ''} ~ ${reservation['re_time'] ?? ''}',
+                            '${reservation['g_name'] ?? ''} · ${reservation['rs_time'] ?? ''} ~ ${reservation['re_time'] ?? ''}',
                             style: const TextStyle(
                               fontSize: 12,
                               color: MemberStyle.muted,
@@ -163,6 +175,14 @@ class _BoardMatchCardState extends ConsumerState<BoardMatchCard> {
                 const SizedBox(height: 16),
                 if (!own)
                   FilledButton(
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                      backgroundColor: MemberStyle.blue,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
                     onPressed: busy || !eligible || id == null
                         ? null
                         : () => act('/team_match/request', id),
@@ -192,7 +212,7 @@ class _BoardMatchCardState extends ConsumerState<BoardMatchCard> {
                   ),
                 if (own) ...[
                   Text(
-                    matched ? '매칭이 성사되었습니다.' : '받은 매칭 신청',
+                    matched ? '매칭이 성사되었습니다.' : '받은 매칭 신청 · ${requests.length}건',
                     style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
                   if (requests.isEmpty)
@@ -201,8 +221,13 @@ class _BoardMatchCardState extends ConsumerState<BoardMatchCard> {
                       child: Text('아직 매칭 신청이 없습니다.'),
                     ),
                   for (final request in requests)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 12),
+                    Container(
+                      margin: const EdgeInsets.only(top: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -210,6 +235,22 @@ class _BoardMatchCardState extends ConsumerState<BoardMatchCard> {
                             '${request['t_name'] ?? request['c_name'] ?? '회원'}',
                             style: const TextStyle(fontWeight: FontWeight.w700),
                           ),
+                          if (request['c_name'] != null)
+                            Text(
+                              '신청 팀장 ${request['c_name']}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: MemberStyle.muted,
+                              ),
+                            ),
+                          if (request['member_count'] != null)
+                            Text(
+                              '팀원 ${request['member_count']}명',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: MemberStyle.muted,
+                              ),
+                            ),
                           Text(
                             switch (request['status']) {
                               'requested' => '신청 대기',
@@ -237,7 +278,7 @@ class _BoardMatchCardState extends ConsumerState<BoardMatchCard> {
                                           comment:
                                               request['comment_seq'] as int,
                                         ),
-                                  child: const Text('수락'),
+                                  child: const Text('승인'),
                                 ),
                                 TextButton(
                                   onPressed: busy

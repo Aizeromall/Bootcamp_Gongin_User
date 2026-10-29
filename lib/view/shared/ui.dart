@@ -18,14 +18,14 @@ Widget pageContent(List<Widget> children) => Center(
   ),
 );
 Widget heading(String title, String subtitle) => Padding(
-  padding: const EdgeInsets.only(bottom: 24),
+  padding: const EdgeInsets.only(bottom: 20),
   child: Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text(
         title,
         style: const TextStyle(
-          fontSize: 24,
+          fontSize: 22,
           fontWeight: FontWeight.w800,
           color: MemberStyle.ink,
         ),

@@ -43,7 +43,10 @@ class InsertCommentRequest(BoardTextRequest):
 
 # 5. 댓글 정렬: 재귀 호출 없이 부모 다음에 자식이 오는 순서로 펼칩니다.
 # depth가 커져도 호출 스택을 사용하지 않으며, 삭제 댓글은 원문을 노출하지 않습니다.
-def order_comments(rows: list[dict]) -> list[dict]:
+def order_comments(rows: list[dict] | tuple[dict, ...]) -> list[dict]:
+    # 수정 일 : 2026-10-28 / 작업자 : 양태건
+    # PyMySQL의 빈 조회 결과(튜플)도 리스트로 통일하여 댓글 없는 글의 500 오류를 방지합니다.
+    rows = list(rows)
     children = {}
     ids = {row["comment_seq"] for row in rows}
     roots = []
@@ -322,4 +325,4 @@ def delete_comment(
             connection.close()
     return {"result": "OK", "bulletin_seq": bulletin_seq, "comment_seq": comment_seq, "comment_delete_state": True}
 
-# 최종 수정 일 : 2026-10-26 / 작업자 : 양태건
+# 최종 수정 일 : 2026-10-28 / 작업자 : 양태건

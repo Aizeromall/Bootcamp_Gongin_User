@@ -25,6 +25,7 @@ class AccountPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider) ?? {};
+    final name = '${session['c_name'] ?? ''}'.trim();
     void open(Widget page) =>
         Navigator.push(context, MaterialPageRoute<void>(builder: (_) => page));
     return ListView(
@@ -33,27 +34,46 @@ class AccountPage extends ConsumerWidget {
         MemberPanel(
           color: Colors.white,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const CircleAvatar(
-                radius: 30,
-                backgroundColor: MemberStyle.greenSurface,
-                child: Icon(
-                  Icons.person_outline,
-                  size: 35,
-                  color: MemberStyle.green,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                '${session['c_name'] ?? '회원'}',
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              Text(
-                '@${session['c_id'] ?? ''}',
-                style: const TextStyle(color: MemberStyle.muted),
+              // 수정 일 : 2026-10-28 / 작업자 : 양태건
+              // 목업처럼 프로필을 가로로 배치하고 실제 가입 종목만 표시합니다.
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: MemberStyle.ink,
+                    child: Text(
+                      name.isEmpty ? '회' : name.characters.first,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${session['c_name'] ?? '회원'}',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        Text(
+                          '@${session['c_id'] ?? ''}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: MemberStyle.muted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
               Wrap(
@@ -61,16 +81,18 @@ class AccountPage extends ConsumerWidget {
                 children: [
                   for (final code
                       in (session['preferred_stocks'] as List? ?? []))
-                    Chip(
-                      label: Text(sports[int.tryParse('$code')] ?? '$code'),
-                      backgroundColor: MemberStyle.surface,
-                      side: BorderSide.none,
+                    MemberStatusBadge(
+                      sports[int.tryParse('$code')] ?? '$code',
+                      color: int.tryParse('$code') == 1
+                          ? MemberStyle.green
+                          : MemberStyle.blue,
                     ),
                 ],
               ),
             ],
           ),
         ),
+        const MemberSectionTitle('내 활동'),
         _menu(Icons.calendar_today_outlined, '예약 내역', onReservations),
         _menu(Icons.groups_outlined, '팀 찾기 · 개설', onTeams),
         _menu(
@@ -78,6 +100,7 @@ class AccountPage extends ConsumerWidget {
           '경기 결과',
           () => open(const ResultPage()),
         ),
+        const MemberSectionTitle('고객지원'),
         _menu(
           Icons.notifications_none,
           '공지사항',
@@ -114,7 +137,8 @@ class AccountPage extends ConsumerWidget {
       border: Border(bottom: BorderSide(color: MemberStyle.line)),
     ),
     child: ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
+      minTileHeight: 54,
       leading: Icon(icon, color: MemberStyle.muted),
       title: Text(
         label,

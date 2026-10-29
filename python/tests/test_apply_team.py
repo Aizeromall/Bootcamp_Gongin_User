@@ -21,7 +21,7 @@ class ApplyTeamTests(unittest.TestCase):
         self.connection = MagicMock()
         self.cursor = self.connection.cursor.return_value.__enter__.return_value
         self.team = {'t_id': 7, 't_name': '우리 팀', 'c_category': '개설일', 'c_id_seq': 'captain_01'}
-        self.joined = {'tr_seq': 3, 'tr_date': '2026-10-27T15:00:00', 'c_category': '가입'}
+        self.joined = {'tr_seq': 3, 'tr_date': '2026-10-28T15:00:00', 'c_category': '', 'tr_state': '대기'}
         self.left = dict(self.joined, c_category='탈퇴')
         self.cursor.fetchone.side_effect = [{'c_id_seq': 'member_01'}, self.team, None, None, self.joined]
         patcher = patch.object(apply_team, 'connect', return_value=self.connection)
@@ -38,13 +38,13 @@ class ApplyTeamTests(unittest.TestCase):
     def test_join_stores_category_date_and_customer_team(self):
         response = self.join()
         self.assertEqual(response.status_code, 201, response.text)
-        self.assertEqual(response.json()['c_category'], '가입')
+        self.assertEqual(response.json()['tr_state'], '대기')
         calls = self.cursor.execute.call_args_list
         self.assertIn('FOR UPDATE', calls[0].args[0])
         self.assertIn('FOR UPDATE', calls[1].args[0])
-        self.assertIn("NOW(), '가입'", calls[4].args[0])
+        self.assertIn("NOW(), '', '대기'", calls[4].args[0])
         self.assertEqual(calls[4].args[1], ('member_01', 7))
-        self.assertEqual(calls[5].args[1], ('우리 팀', 'member_01'))
+        self.assertFalse(any('UPDATE customer' in c.args[0] for c in calls))
         self.connection.commit.assert_called_once()
         self.connection.rollback.assert_not_called()
         self.connection.close.assert_called_once()
@@ -55,8 +55,8 @@ class ApplyTeamTests(unittest.TestCase):
         response = self.join()
         self.assertEqual(response.status_code, 201)
         calls = self.cursor.execute.call_args_list
-        self.assertIn("UPDATE t_register SET c_category = '가입'", calls[4].args[0])
-        self.assertEqual(calls[4].args[1], (3, 'member_01', 7))
+        self.assertIn("UPDATE t_register SET c_category = '', tr_state = '대기'", calls[4].args[0])
+        self.assertEqual(calls[4].args[1], (3,))
         self.assertFalse(any('INSERT INTO t_register' in c.args[0] for c in calls))
 
     def test_duplicate_or_other_active_membership_rejected(self):
@@ -84,7 +84,7 @@ class ApplyTeamTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(response.json()['c_category'], '탈퇴')
         calls = self.cursor.execute.call_args_list
-        self.assertIn("c_category = '탈퇴', tr_date = NOW()", calls[4].args[0])
+        self.assertIn("c_category = '탈퇴', tr_state = '탈퇴', tr_date = NOW()", calls[4].args[0])
         self.assertEqual(calls[4].args[1], (3, 'member_01', 7))
         self.assertEqual(calls[5].args[1], ('member_01', '우리 팀'))
         self.assertFalse(any('DELETE FROM t_register' in c.args[0] for c in calls))
@@ -167,8 +167,8 @@ class ApplyTeamTests(unittest.TestCase):
             {'tr_seq': 3, 'c_category': '탈퇴일'}, self.joined]
         response = self.join()
         self.assertEqual(response.status_code, 201, response.text)
-        self.assertEqual(response.json()['c_category'], '가입')
-        self.assertIn("SET c_category = '가입'", self.cursor.execute.call_args_list[4].args[0])
+        self.assertEqual(response.json()['tr_state'], '대기')
+        self.assertIn("SET c_category = '', tr_state = '대기'", self.cursor.execute.call_args_list[4].args[0])
 
     def test_legacy_join_state_leaves_using_new_left_value(self):
         self.cursor.fetchone.side_effect = [{}, self.team, {'tr_seq': 3, 'c_category': '가입일'},
@@ -190,3 +190,7 @@ if __name__ == '__main__':
     unittest.main()
 
 # 최종 수정 일 : 2026-10-27 / 작업자 : 양태건
+
+# 수정 일 : 2026-10-28 / 작업자 : 양태건
+# 가입 신청은 대기로 저장하고 소속을 갱신하지 않는 계약으로 검증합니다.
+# 최종 수정 일 : 2026-10-28 / 작업자 : 양태건

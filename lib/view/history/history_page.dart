@@ -7,6 +7,8 @@ import '../../vm/member_state.dart';
 import '../../vm/history_state.dart';
 import '../payment/payment_page.dart';
 import '../shared/ui.dart';
+import '../shared/member_components.dart';
+import '../shared/member_style.dart';
 import 'reservation_detail_page.dart';
 
 class HistoryPage extends ConsumerStatefulWidget {
@@ -137,11 +139,28 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // 수정 일 : 2026-10-28 / 작업자 : 양태건
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    MemberStatusBadge(
+                      kind == 'cancel'
+                          ? '취소 내역'
+                          : row['is_paid'] == true
+                          ? '결제 기록 완료'
+                          : '결제 대기',
+                      color: kind == 'cancel' ? Colors.red : MemberStyle.blue,
+                    ),
+                    MemberStatusBadge(sports[ref.watch(sportProvider)]!),
+                  ],
+                ),
+                const SizedBox(height: 12),
                 Text(
                   '${row['g_name']}',
                   style: const TextStyle(
-                    fontSize: 21,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
                 // 수정 일 : 2026-10-28 / 작업자 : 양태건
@@ -165,7 +184,12 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
                 const SizedBox(height: 8),
                 Text(
                   '${row['r_date']} · ${row['rs_time']} ~ ${row['re_time']}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: MemberStyle.muted,
+                  ),
                 ),
+                const SizedBox(height: 12),
                 // 디버그: 취소일 대신 실제 취소 사유를 표시합니다.
                 // 작업자 : 양태건 / 최종 수정일 : 2026-10-26
                 if (kind == 'cancel')

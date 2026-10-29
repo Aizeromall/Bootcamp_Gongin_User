@@ -152,7 +152,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('신청 팀'), findsOneWidget);
       final action = decision == 'accept'
-          ? find.widgetWithText(FilledButton, '수락')
+          ? find.widgetWithText(FilledButton, '승인')
           : find.widgetWithText(TextButton, '거절');
       await tester.ensureVisible(action);
       await tester.tap(action);

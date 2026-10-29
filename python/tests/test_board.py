@@ -32,6 +32,25 @@ class BoardTests(unittest.TestCase):
         self.post = dict(c_id_seq='member_01', board_title='제목', board_content='내용',
                          event_category='축구', board_category='자유')
 
+    # 수정 일 : 2026-10-28 / 작업자 : 양태건
+    # 실제 DB 없이 드라이버의 빈 튜플 반환을 재현합니다.
+    def test_empty_comment_tuple_returns_empty_list(self):
+        self.cursor.fetchone.return_value = {'bulletin_seq': 1, 'c_id_seq': 'member_01'}
+        self.cursor.fetchall.return_value = ()
+        response = self.client.get('/board/comment/select/1')
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json(), {'total': 0, 'results': []})
+        self.connection.commit.assert_not_called()
+        self.assertTrue(all(call.args[0].lstrip().startswith('SELECT')
+                            for call in self.cursor.execute.call_args_list))
+        self.connection.close.assert_called_once()
+
+    def test_tuple_comments_keep_parent_child_order(self):
+        child = dict(comment_seq=2, reply_to_comment_seq=1, comment_delete_state=0, comment_content='답글')
+        parent = dict(comment_seq=1, reply_to_comment_seq=None, comment_delete_state=0, comment_content='댓글')
+        result = comment.order_comments((child, parent))
+        self.assertEqual([row['comment_seq'] for row in result], [1, 2])
+
     def test_list_filters_pagination_and_literal_search(self):
         self.cursor.fetchone.return_value = {'total': 1}
         self.cursor.fetchall.return_value = [{'bulletin_seq': 1, 'board_title': '제목'}]
@@ -417,3 +436,5 @@ if __name__ == '__main__':
     unittest.main()
 
 # 최종 수정 일 : 2026-10-26 / 작업자 : 양태건
+
+# 최종 수정 일 : 2026-10-28 / 작업자 : 양태건

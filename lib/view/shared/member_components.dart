@@ -107,3 +107,73 @@ class MemberInfoRow extends StatelessWidget {
   );
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+
+// 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 실제 서버 상태를 짧은 라벨로 표현하며 색상만으로 상태를 구분하지 않습니다.
+class MemberStatusBadge extends StatelessWidget {
+  const MemberStatusBadge(
+    this.label, {
+    super.key,
+    this.color = MemberStyle.blue,
+  });
+  final String label;
+  final Color color;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.09),
+      borderRadius: BorderRadius.circular(6),
+    ),
+    child: Text(
+      label,
+      style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700),
+    ),
+  );
+}
+
+class MemberMetricTile extends StatelessWidget {
+  const MemberMetricTile(this.label, this.value, {super.key});
+  final String label;
+  final Object? value;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(13),
+    decoration: BoxDecoration(
+      color: MemberStyle.surface,
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11, color: MemberStyle.muted),
+        ),
+        const SizedBox(height: 5),
+        Text(
+          '${value ?? '미등록'}',
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+        ),
+      ],
+    ),
+  );
+}
+
+class MemberSectionTitle extends StatelessWidget {
+  const MemberSectionTitle(this.title, {super.key});
+  final String title;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 12, bottom: 12),
+    child: Text(
+      title,
+      style: const TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w800,
+        color: MemberStyle.ink,
+      ),
+    ),
+  );
+}
+// 최종 수정 일 : 2026-10-28 / 작업자 : 양태건

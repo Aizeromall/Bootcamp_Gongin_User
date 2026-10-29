@@ -113,6 +113,8 @@ class _MyAppState extends ConsumerState<MyApp> {
         colorScheme: ColorScheme.fromSeed(seedColor: MemberStyle.blue).copyWith(
           primary: MemberStyle.blue,
           onPrimary: Colors.white,
+          secondaryContainer: const Color(0xFFEAF2FF),
+          onSecondaryContainer: MemberStyle.blue,
           surface: Colors.white,
           onSurface: MemberStyle.ink,
         ),
@@ -122,6 +124,31 @@ class _MyAppState extends ConsumerState<MyApp> {
           foregroundColor: MemberStyle.ink,
           surfaceTintColor: Colors.transparent,
           elevation: 0,
+          centerTitle: false,
+          titleTextStyle: TextStyle(
+            fontFamily: 'IBM Plex Sans KR',
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: MemberStyle.ink,
+          ),
+        ),
+        // 수정 일 : 2026-10-28 / 작업자 : 양태건
+        // 목업의 작은 제목·본문·윤곽선 카드를 공통 적용합니다.
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(fontSize: 14, height: 1.55),
+          bodyMedium: TextStyle(fontSize: 13, height: 1.5),
+          titleLarge: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+          titleMedium: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: MemberStyle.ink,
+            side: const BorderSide(color: MemberStyle.line),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
         ),
         dividerTheme: const DividerThemeData(
           color: MemberStyle.line,
@@ -187,7 +214,8 @@ class _MyAppState extends ConsumerState<MyApp> {
           elevation: 0,
           color: Colors.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: MemberStyle.line),
           ),
         ),
       ),

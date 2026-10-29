@@ -11,6 +11,7 @@ import '../../vm/board_state.dart';
 import '../shared/member_style.dart';
 import 'board_widgets.dart';
 import 'board_match_card.dart';
+import 'board_recruitment_card.dart';
 import '../shared/api_content.dart';
 import '../shared/ui.dart';
 import 'board_editor.dart';
@@ -349,6 +350,12 @@ class _BoardDetailPageState extends ConsumerState<BoardDetailPage> {
               ),
               if (postValue != null && boardReservationId(postValue) != null)
                 BoardMatchCard(seq: widget.seq),
+              // 수정 일 : 2026-10-28 / 작업자 : 양태건
+              if (postValue?['board_category'] == '팀원모집')
+                BoardRecruitmentCard(
+                  seq: widget.seq,
+                  sport: '${postValue?['event_category']}',
+                ),
               Container(height: 8, color: MemberStyle.surface),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),

@@ -94,11 +94,11 @@ def change_captain(payload: ChangeCaptainRequest, t_id: int = Path(gt=0, descrip
 
             # 3) 새 팀장이 이 팀의 현재 팀원인지 확인 (탈퇴한 회원은 불가)
             cursor.execute(
-                """SELECT c_category FROM t_register WHERE c_id_seq = %s AND t_id = %s FOR UPDATE""",
+                """SELECT c_category, tr_state FROM t_register WHERE c_id_seq = %s AND t_id = %s FOR UPDATE""",
                 (new_captain, t_id),
             )
             member = cursor.fetchone()
-            if member is None or (member["c_category"] or "") not in ACTIVE_MEMBER_CATEGORIES:
+            if member is None or (member["c_category"] or "") not in ACTIVE_MEMBER_CATEGORIES or (member.get("tr_state") or "") not in ("", "승인"):
                 raise HTTPException(status_code=409, detail="새 팀장은 이 팀의 현재 팀원이어야 합니다.")
 
             # 4) 팀장 변경 이력 저장 (새 팀장 B)
@@ -167,4 +167,6 @@ def change_captain(payload: ChangeCaptainRequest, t_id: int = Path(gt=0, descrip
         if connection is not None:
             connection.close()  # 성공/실패 상관없이 DB 연결 종료
 
-# 최종 수정 일 : 2026-10-28
+# 수정 일 : 2026-10-28 / 작업자 : 양태건
+# 승인된 실제 팀원에게만 위임하며 기존 빈 상태는 호환합니다.
+# 최종 수정 일 : 2026-10-28 / 작업자 : 양태건

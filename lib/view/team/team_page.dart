@@ -7,11 +7,13 @@ import '../../vm/member_state.dart';
 import '../../vm/member_features.dart';
 import '../shared/api_content.dart';
 import '../shared/ui.dart';
+import '../shared/member_components.dart';
+import '../shared/member_style.dart';
 import 'team_create_page.dart';
 import 'team_detail_page.dart';
 
 // 수정 일 : 2026-10-27 / 작업자 : 양태건
-// 팀 생성·즉시 가입·탈퇴·폐지를 실제 API와 연결합니다. 권한 판단은 서버가 최종 수행합니다.
+// 팀 생성·가입 신청·탈퇴·폐지를 실제 API와 연결합니다. 권한 판단은 서버가 최종 수행합니다.
 class TeamPage extends ConsumerStatefulWidget {
   const TeamPage({super.key});
   @override
@@ -83,7 +85,12 @@ class _TeamPageState extends ConsumerState<TeamPage> {
           );
       if (!mounted || ref.read(memberIdProvider) != id) return;
       ref.invalidate(apiDocumentProvider);
-      showMessage(context, '팀 정보가 변경되었습니다.');
+      showMessage(
+        context,
+        path.contains('/apply/')
+            ? '가입 신청이 완료되었습니다. 팀장 승인을 기다려 주세요.'
+            : '팀 정보가 변경되었습니다.',
+      );
     } catch (error) {
       if (mounted) showMessage(context, error);
     } finally {
@@ -95,7 +102,7 @@ class _TeamPageState extends ConsumerState<TeamPage> {
   Widget build(BuildContext context) {
     final id = ref.watch(memberIdProvider);
     return pageContent([
-      heading('함께 뛰는 우리 팀', '팀을 개설하면 팀장이 됩니다. 가입 신청은 즉시 가입으로 처리됩니다.'),
+      heading('함께 뛰는 우리 팀', '팀을 개설하면 팀장이 됩니다. 팀장이 승인한 후 가입이 완료됩니다.'),
       FilledButton.icon(
         onPressed: busy ? null : create,
         icon: const Icon(Icons.group_add_outlined),
@@ -126,10 +133,34 @@ class _TeamPageState extends ConsumerState<TeamPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        '${row['t_name']}',
-                        style: Theme.of(context).textTheme.titleLarge,
+                      // 수정 일 : 2026-10-28 / 작업자 : 양태건
+                      Row(
+                        children: [
+                          const CircleAvatar(
+                            backgroundColor: MemberStyle.greenSurface,
+                            child: Icon(
+                              Icons.shield_outlined,
+                              color: MemberStyle.green,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              '${row['t_name']}',
+                              style: const TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          if (row['captain_id'] == id)
+                            const MemberStatusBadge(
+                              '팀장',
+                              color: MemberStyle.green,
+                            ),
+                        ],
                       ),
+                      const SizedBox(height: 12),
                       Text(
                         '팀장 ${row['captain_name'] ?? '미등록'} · ${row['member_count'] ?? 0}명',
                       ),
@@ -157,7 +188,7 @@ class _TeamPageState extends ConsumerState<TeamPage> {
                                     body: {'c_id_seq': id},
                                     confirm: '팀 가입',
                                   ),
-                            child: const Text('가입'),
+                            child: const Text('가입 신청'),
                           ),
                           if (row['captain_id'] != id)
                             TextButton(

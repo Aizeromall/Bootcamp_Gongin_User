@@ -20,6 +20,8 @@ from ..database import connect
 
 # 수정 일 : 2026-10-27 / 작업자 : 양태건
 # 가입 상태는 가입으로 저장하며 기존 가입일 데이터는 조회 호환만 유지합니다.
+# 수정 일 : 2026-10-28 / 작업자 : 양태건
+# tr_state 대기·거절은 실제 가입 인원에서 제외하고 기존 빈 상태는 호환합니다.
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -73,7 +75,7 @@ def create_team(payload: CreateTeamRequest):
             # 수정 일 : 2026-10-27 / 작업자 : 양태건
             # 가입 중인 소속만 검사합니다. 탈퇴 이력이 있어도 새 팀을 개설할 수 있습니다.
             cursor.execute(
-                "SELECT 1 FROM t_register WHERE c_id_seq = %s AND COALESCE(c_category, '') IN ('', '가입', '가입일') LIMIT 1 FOR UPDATE",
+                "SELECT 1 FROM t_register WHERE c_id_seq = %s AND COALESCE(c_category, '') IN ('', '가입', '가입일') AND COALESCE(tr_state, '') IN ('', '승인') LIMIT 1 FOR UPDATE",
                 (payload.c_id_seq,),
             )
             if cursor.fetchone() is not None:
@@ -98,7 +100,7 @@ def create_team(payload: CreateTeamRequest):
 
             # 개설자도 팀원 수에 포함되도록 팀 가입 기록을 저장합니다.
             cursor.execute(
-                "INSERT INTO t_register (c_id_seq, t_id, tr_date, c_category) VALUES (%s, %s, NOW(), '가입')",
+                "INSERT INTO t_register (c_id_seq, t_id, tr_date, c_category, tr_state) VALUES (%s, %s, NOW(), '가입', '승인')",
                 (payload.c_id_seq, t_id),
             )
 
@@ -151,4 +153,4 @@ def create_team(payload: CreateTeamRequest):
             connection.close()
 
 
-# 최종 수정 일 : 2026-10-27 / 작업자 : 양태건
+# 최종 수정 일 : 2026-10-28 / 작업자 : 양태건

@@ -338,8 +338,8 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(app(container, const BoardDetailPage(seq: 10)));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.widgetWithText(FilledButton, '수락'));
-    await tester.tap(find.widgetWithText(FilledButton, '수락'));
+    await tester.ensureVisible(find.widgetWithText(FilledButton, '승인'));
+    await tester.tap(find.widgetWithText(FilledButton, '승인'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('확인'));
     await tester.pumpAndSettle();

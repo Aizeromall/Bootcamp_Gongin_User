@@ -19,6 +19,8 @@ from ..database import connect
 
 # 수정 일 : 2026-10-27 / 작업자 : 양태건
 # 가입 상태는 가입으로 저장하며 기존 가입일 데이터는 조회 호환만 유지합니다.
+# 수정 일 : 2026-10-28 / 작업자 : 양태건
+# tr_state 대기·거절은 실제 가입 인원에서 제외하고 기존 빈 상태는 호환합니다.
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -32,7 +34,7 @@ TEAM_SELECT = """
     SELECT t.t_id, t.t_name, t.t_logo, t.t_rating,
            tc.c_id_seq AS creator_id, tc.c_category, tc.c_date,
            captain.c_id_seq AS captain_id, captain.c_name AS captain_name,
-           (SELECT COUNT(*) FROM t_register tr WHERE tr.t_id = t.t_id AND COALESCE(tr.c_category, '') IN ('', '가입', '가입일')) AS member_count
+           (SELECT COUNT(*) FROM t_register tr WHERE tr.t_id = t.t_id AND COALESCE(tr.c_category, '') IN ('', '가입', '가입일') AND COALESCE(tr.tr_state, '') IN ('', '승인')) AS member_count
     FROM team t
     LEFT JOIN team_create tc ON tc.t_id = t.t_id
     LEFT JOIN customer captain ON captain.c_id_seq = COALESCE(
@@ -120,4 +122,4 @@ def select_team(t_id: int = Path(gt=0, description="조회할 팀 ID")):
             connection.close()
 
 
-# 최종 수정 일 : 2026-10-27 / 작업자 : 양태건
+# 최종 수정 일 : 2026-10-28 / 작업자 : 양태건

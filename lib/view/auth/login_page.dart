@@ -161,10 +161,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   const SizedBox(height: 24),
                   FilledButton(
                     onPressed: busy ? null : login,
-                    child: Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: Text(busy ? '로그인 중…' : '로그인'),
-                    ),
+                    child: Text(busy ? '로그인 중…' : '로그인'),
                   ),
                   TextButton(
                     onPressed: busy

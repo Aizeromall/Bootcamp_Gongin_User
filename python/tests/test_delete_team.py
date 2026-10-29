@@ -52,7 +52,7 @@ class DeleteTeamTests(unittest.TestCase):
         self.assertNotIn('c_id_seq =', calls[3].args[0])
         self.assertIn("c.c_team = '무소속'", calls[4].args[0])
         self.assertEqual(calls[4].args[1], (7, '우리 팀'))
-        self.assertIn("UPDATE t_register SET c_category = '탈퇴', tr_date = NOW()", calls[5].args[0])
+        self.assertIn("UPDATE t_register SET c_category = '탈퇴', tr_state = '탈퇴', tr_date = NOW()", calls[5].args[0])
         self.assertEqual(calls[5].args[1], (7,))
         self.assertFalse(any('DELETE FROM t_register' in call.args[0] for call in calls))
         self.assertFalse(any('DELETE FROM team ' in call.args[0] or
@@ -142,3 +142,7 @@ if __name__ == '__main__':
     unittest.main()
 
 # 최종 수정 일 : 2026-10-27 / 작업자 : 양태건
+
+# 수정 일 : 2026-10-28 / 작업자 : 양태건
+# 탈퇴 상태와 대기 신청 종료 SQL을 포함한 폐지 계약을 검증합니다.
+# 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
