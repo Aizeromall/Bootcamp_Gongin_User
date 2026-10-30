@@ -55,6 +55,7 @@ class _RentalAvailabilityPageState
     extends ConsumerState<RentalAvailabilityPage> {
   DateTime date = DateUtils.dateOnly(DateTime.now());
   int? sport;
+  String? selectedTime;
 
   @override
   Widget build(BuildContext context) {
@@ -75,7 +76,7 @@ class _RentalAvailabilityPageState
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          const Text('대관 가능한 구장과 시간을 선택해 주세요.'),
+          const Text('날짜와 시간을 선택하면 대관 가능한 구장을 보여드립니다.'),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
@@ -99,11 +100,50 @@ class _RentalAvailabilityPageState
                 firstDate: DateUtils.dateOnly(DateTime.now()),
                 lastDate: DateTime.now().add(const Duration(days: 365)),
               );
-              if (chosen != null && mounted) setState(() => date = chosen);
+              if (chosen != null && mounted) {
+                setState(() {
+                  date = chosen;
+                  selectedTime = null;
+                });
+              }
             },
           ),
+          // 수정 일 : 2026-10-30 / 작업자 : 최현준
+          // 서버의 2시간 대관 단위에서 시간을 먼저 고른 뒤 구장 목록을 필터링합니다.
+          const Text('대관 시간 선택'),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              for (var hour = 8; hour <= 22; hour += 2)
+                ChoiceChip(
+                  key: ValueKey('rental-time-$hour'),
+                  label: Text(
+                    '${hour.toString().padLeft(2, '0')}:00 ~ ${(hour + 2).toString().padLeft(2, '0')}:00',
+                  ),
+                  selected:
+                      selectedTime == '${hour.toString().padLeft(2, '0')}:00',
+                  onSelected:
+                      DateTime(
+                        date.year,
+                        date.month,
+                        date.day,
+                        hour,
+                      ).isAfter(DateTime.now())
+                      ? (_) => setState(
+                          () => selectedTime =
+                              '${hour.toString().padLeft(2, '0')}:00',
+                        )
+                      : null,
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
           if (selected == null)
             const Text('가입한 종목을 확인해 주세요.')
+          else if (selectedTime == null)
+            const Text('대관 시간을 선택해 주세요.')
           else
             ref
                 .watch(_rentalOptionsProvider(key))
@@ -124,6 +164,9 @@ class _RentalAvailabilityPageState
                   ),
                   data: (options) {
                     final visible = options.where((option) {
+                      if ('${option.slot['rs_time']}' != selectedTime) {
+                        return false;
+                      }
                       final parts = '${option.slot['rs_time']}'.split(':');
                       final hour = int.tryParse(parts.first);
                       final minute = parts.length > 1
@@ -142,7 +185,7 @@ class _RentalAvailabilityPageState
                     if (visible.isEmpty) {
                       return const Padding(
                         padding: EdgeInsets.all(20),
-                        child: Text('선택한 날짜에 대관 가능한 시간이 없습니다.'),
+                        child: Text('선택한 시간에 대관 가능한 구장이 없습니다.'),
                       );
                     }
                     return Column(
@@ -161,6 +204,15 @@ class _RentalAvailabilityPageState
                                 ref
                                     .read(sportProvider.notifier)
                                     .select(selected);
+                                // 목록을 본 뒤 예약 상황이 바뀌었을 수 있어 다시 조회합니다.
+                                ref.invalidate(
+                                  apiDocumentProvider(
+                                    apiQuery(
+                                      '/ground/reservation/slots/${option.ground['g_code']}',
+                                      {'r_date': day(date)},
+                                    ),
+                                  ),
+                                );
                                 await Navigator.push(
                                   context,
                                   MaterialPageRoute<void>(
@@ -168,9 +220,11 @@ class _RentalAvailabilityPageState
                                       ground: option.ground,
                                       rental: true,
                                       initialDate: date,
+                                      initialTime: '${option.slot['rs_time']}',
                                     ),
                                   ),
                                 );
+                                if (!context.mounted) return;
                                 ref.invalidate(_rentalOptionsProvider(key));
                                 ref.invalidate(apiDocumentProvider);
                               },
@@ -186,3 +240,5 @@ class _RentalAvailabilityPageState
   }
 }
 // 최종 수정 일 : 2026-10-30 / 작업자 : 최현준
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (선택 시간 전달)
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (시간 선택 후 구장 필터)

@@ -95,6 +95,14 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('4개'), findsOneWidget);
+    expect(find.text('운영시간 08:00~22:00'), findsWidgets);
+    // 수정 일 : 2026-10-30 / 작업자 : 최현준
+    // 구장 카드에 다음 경기 시간 또는 남은 시간이 없다는 안내가 표시됩니다.
+    expect(
+      find.textContaining('다음 경기 시간 ·').evaluate().isNotEmpty ||
+          find.text('남은 경기 시간 없음').evaluate().isNotEmpty,
+      isTrue,
+    );
     expect(find.text('오늘 5개 매치'), findsNothing);
     expect(tester.takeException(), isNull);
     if (preview.isNotEmpty) {
