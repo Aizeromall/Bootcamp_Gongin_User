@@ -24,7 +24,7 @@ def database():
 def row(category):
     return {"r_seq": 7, "c_id_seq": "member_01", "g_code": 2, "r_date": date(2100, 1, 1),
             "r_check": 0, "r_category": "1", "r_c_category": "", "reservation_category": category,
-            "g_price": 10000, "g_num": 10}
+            "g_price": 10000, "g_num": 10, "rs_time": "10:00", "re_time": "12:00"}
 
 
 def test_constants_and_sql_conditions_are_strict_strings():
@@ -56,7 +56,7 @@ def test_existing_string_category_blocks_rental_before_insert():
         cursor.fetchall.return_value = [{"reservation_category": category}]
         with patch.object(rental, "connect", return_value=connection):
             try:
-                rental.create_ground_reservation("member_01", "2", date(2100, 1, 1), "10:00")
+                rental.create_ground_reservation("member_01", "2", date(2100, 1, 1), "10:00", "카카오페이")
                 raise AssertionError("must reject occupied slot")
             except HTTPException as error:
                 assert error.status_code == 409
@@ -67,7 +67,7 @@ def test_existing_string_category_blocks_rental_before_insert():
 
 def test_rental_cancel_accepts_string_two():
     connection, cursor = database()
-    cursor.fetchone.side_effect = [row("2"), None, row("2"), None]
+    cursor.fetchone.side_effect = [{'g_code': 2}, {'g_code': 2}, row("2"), None, row("2"), None]
     cursor.fetchall.return_value = []
     with patch.object(rental, "connect", return_value=connection):
         result = rental.cancel_ground_reservation(7, "가상 취소 사유", "member_01")
@@ -105,14 +105,14 @@ def test_new_reservation_and_rental_insert_string_category():
     for module, category in [(reservation, "1"), (rental, "2")]:
         connection, cursor = database()
         if module is reservation:
-            cursor.fetchone.side_effect = [{"g_code": 2, "g_num": 10}, {"exists": 1}, None, None, None,
+            cursor.fetchone.side_effect = [{"g_code": 2, "g_num": 10, "g_price": 10000}, {"exists": 1}, None, None, None,
                                            {"reservation_count": 0}]
         else:
             cursor.fetchone.side_effect = [{"g_code": 2, "g_price": 10000}, {"exists": 1}, None]
             cursor.fetchall.return_value = []
         with patch.object(module, "connect", return_value=connection):
             create = module.create_reservation if module is reservation else module.create_ground_reservation
-            create("member_01", "2", date(2100, 1, 1), "10:00")
+            create("member_01", "2", date(2100, 1, 1), "10:00", "카카오페이")
         inserted = [call for call in cursor.execute.call_args_list if "INSERT INTO reservation" in call.args[0]]
         assert len(inserted) == 1 and inserted[0].args[1][-3] == category
 

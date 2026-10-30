@@ -34,7 +34,8 @@ from ..database import connect  # 공용 DB 연결 함수 (python/FastAPI/databa
 #   find_assigned_manager : 요일·시간대에 배정된 경기매니저 조회
 #   sport_from_customer_id : c_id_seq 끝 번호(01~04)로 종목 확인
 from ..match.reservation import TIME_SLOTS, find_assigned_manager, sport_from_customer_id
-from ..team_match.lineup import guard_participant, participant_condition, cancel_pending
+from ..match.payment import PaymentMethod, insert_payment
+from ..team_match.lineup import guard_participant, participant_condition, cancel_pending, cancel_confirmed
 #   format_time : 시간 값 → "08:00" 형식으로 통일
 #   RESERVATION_MANAGER_JOIN : 예약 행마다 배정표 기준 매니저를 붙이는 JOIN
 from ..match.reservation_search import RESERVATION_MANAGER_JOIN, format_time
@@ -46,6 +47,7 @@ from ..match.reservation_status import (
     RESERVATION_MATCH,
     RESERVATION_RENTAL,
     cancel_reason,
+    cancellation_allowed,
     category_condition,
     is_canceled,
     reservation_type_condition,
@@ -193,6 +195,7 @@ def create_ground_reservation(
     g_code: Annotated[str, Body(min_length=1, max_length=45, description="ground 테이블의 구장 코드")],
     r_date: Annotated[date, Body(description="대여 일자")],
     rs_time: Annotated[str, Body(description="대여 시작 시간: 08:00~22:00, 2시간 단위")],
+    p_method: Annotated[PaymentMethod, Body(description="결제 기록에 사용할 결제 수단")],
 ):
     c_id_seq, g_code = c_id_seq.strip(), g_code.strip()  # 앞뒤 공백 제거
     if rs_time not in TIME_SLOTS:
@@ -202,6 +205,7 @@ def create_ground_reservation(
 
     sport_name, re_time = sport_from_customer_id(c_id_seq), TIME_SLOTS[rs_time]  # 종목 확인 + 종료 시간(2시간 뒤)
     connection = None
+    stage = "구장·회원·슬롯 확인"
     try:
         connection = connect()  # DB 연결
         with connection.cursor() as cursor:
@@ -237,6 +241,7 @@ def create_ground_reservation(
             #   reservation_category = 2 (구장대여)
             #   r_check = 0 (팀매칭 성사 전), r_category = "1" (예약), r_c_category = "" (취소 사유 없음)
             #   r_category / r_c_category 값은 실력매칭 예약(match/reservation.py)과 같은 형식
+            stage = "예약 저장"
             cursor.execute(
                 """INSERT INTO reservation
                     (g_code, c_id_seq, rs_time, re_time, r_date, r_check, reservation_category, r_category, r_c_category)
@@ -246,7 +251,14 @@ def create_ground_reservation(
             r_seq = cursor.lastrowid  # 방금 저장된 예약번호 (AUTO_INCREMENT)
             if not isinstance(r_seq, int) or r_seq <= 0:
                 raise RuntimeError("reservation.r_seq 자동 증가값을 가져오지 못했습니다.")
+            # 대여와 결제 기록을 한 트랜잭션에서 확정합니다.
+            stage = "결제 기록 저장"
+            payment = insert_payment(cursor, {"r_seq": r_seq, "c_id_seq": c_id_seq,
+                "r_date": r_date, "g_code": g_code, "reservation_category": RESERVATION_RENTAL,
+                "g_price": ground["g_price"]}, p_method)
+        stage = "트랜잭션 확정"
         connection.commit()  # 위 작업을 한 번에 확정
+        logger.info("대여·결제 기록 트랜잭션 확정: reservation_id=%s", r_seq)
         return {
             "result": "OK",
             "r_seq": r_seq,                                       # 예약번호 (결제 시 사용)
@@ -260,20 +272,22 @@ def create_ground_reservation(
             "g_price": ground["g_price"],                         # 대여 금액
             "m_id": manager["m_id"] if manager else None,         # 담당 매니저 ID
             "m_name": manager["m_name"] if manager else None,     # 담당 매니저 이름
+            "payment": payment,
         }
-    except HTTPException:
+    except HTTPException as error:
         if connection is not None:
             connection.rollback()  # 위에서 만든 404/409는 되돌린 뒤 그대로 전달
+        logger.info("대여·결제 기록 처리 거절: 단계=%s status=%s", stage, error.status_code)
         raise
-    except pymysql.MySQLError:
+    except pymysql.MySQLError as error:
         if connection is not None:
             connection.rollback()  # 에러 시 저장 취소
-        logger.exception("구장대여 DB 처리 실패")
+        logger.error("대여·결제 기록 DB 처리 실패: 단계=%s 오류유형=%s", stage, type(error).__name__)
         raise HTTPException(status_code=500, detail="구장 대여 중 DB 오류가 발생했습니다.")
-    except Exception:
+    except Exception as error:
         if connection is not None:
             connection.rollback()
-        logger.exception("구장대여 처리 실패")
+        logger.error("대여·결제 기록 처리 실패: 단계=%s 오류유형=%s", stage, type(error).__name__)
         raise HTTPException(status_code=500, detail="구장 대여에 실패했습니다.")
     finally:
         if connection is not None:
@@ -377,10 +391,18 @@ def cancel_ground_reservation(
     try:
         connection = connect()
         with connection.cursor() as cursor:
+            # 예약 생성과 동일하게 구장을 먼저 잠가 같은 시간의 경합을 막습니다.
+            cursor.execute("SELECT g_code FROM reservation WHERE r_seq = %s", (r_seq,))
+            target = cursor.fetchone()
+            if target is None:
+                raise HTTPException(404, "존재하지 않는 구장대여 번호입니다.")
+            cursor.execute("SELECT g_code FROM ground WHERE g_code = %s FOR UPDATE", (target['g_code'],))
+            if cursor.fetchone() is None:
+                raise HTTPException(404, "존재하지 않는 구장 코드입니다.")
             # 1) 취소할 대여 조회
             # FOR UPDATE : 취소하는 동안 다른 요청이 이 대여를 바꾸지 못하게 잠금
             cursor.execute(
-                """SELECT r_seq, c_id_seq, r_date, r_check, reservation_category, r_category, r_c_category
+                """SELECT r_seq, c_id_seq, r_date, rs_time, r_check, reservation_category, r_category, r_c_category
                     FROM reservation
                     WHERE r_seq = %s
                     FOR UPDATE""",
@@ -399,15 +421,14 @@ def cancel_ground_reservation(
             if is_canceled(reservation):
                 raise HTTPException(status_code=409, detail="이미 취소된 대여입니다.")
 
-            # 4) 팀매칭 성사 여부 확인 (r_check = 1 이면 성사)
-            if bool(reservation["r_check"]):
-                raise HTTPException(status_code=409, detail="팀매칭이 성사된 대여는 취소할 수 없습니다.")
-
-            # 5) 지난 날짜 대여인지 확인
-            if reservation["r_date"] < date.today():
-                raise HTTPException(status_code=409, detail="이미 지난 대여는 취소할 수 없습니다.")
+            if not cancellation_allowed(reservation['r_date'], reservation['rs_time']):
+                raise HTTPException(status_code=409, detail="경기 시작 1시간 전부터는 취소할 수 없습니다.")
             cursor.execute('SELECT r.*,g.g_num FROM reservation r JOIN ground g ON g.g_code=r.g_code WHERE r.r_seq=%s', (r_seq,))
-            cancel_pending(cursor, cursor.fetchone())
+            rental = cursor.fetchone()
+            if reservation['r_check']:
+                cancel_confirmed(cursor, rental)
+            else:
+                cancel_pending(cursor, rental)
 
             # 중간 수정 작성자 - 신현진
             # 수정일 2026.10.28
@@ -470,4 +491,4 @@ def cancel_ground_reservation(
 # 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (소셜 회원 ID 입력 길이 DB 정합성 적용)
 # 최종 수정 일 : 2026-10-28 수정자 : 신현진 (회원 취소 사유 글 검사, 환불 대상 안내)
 # 최종 수정 일 : 2026-10-29 / 작업자 : 최현준 (main 환불 대상 안내와 소셜 회원 ID 길이 처리 통합)
-# 최종 수정 일 : 2026-10-30 / 작업자 : 최현준
+# 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (1시간 전 취소 제한과 성사 경기 정리)

@@ -12,8 +12,7 @@ import pymysql
 from fastapi import APIRouter, Body, HTTPException, status
 
 from ..database import connect
-from .reservation_status import RESERVATION_MATCH, RESERVATION_RENTAL, is_canceled
-from ..team_match.lineup import guard_participant
+from .reservation_status import RESERVATION_RENTAL, is_canceled
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -34,6 +33,29 @@ def calculate_payment_amount(g_price: object, g_num: object) -> int:
         return int((price / capacity).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
     except (InvalidOperation, ValueError):
         raise HTTPException(status_code=409, detail="결제할 수 없는 구장 금액 또는 수용 인원입니다.")
+
+
+# 수정 일 : 2026-10-30 / 작업자 : 최현준
+# 호출자가 소유한 트랜잭션에서 결제를 저장하며 여기서는 commit하지 않습니다.
+def insert_payment(cursor, reservation: dict, p_method: str) -> dict:
+    amount = calculate_payment_amount(
+        reservation["g_price"],
+        1 if reservation.get("reservation_category") == RESERVATION_RENTAL else reservation["g_num"],
+    )
+    cursor.execute(
+        """INSERT INTO pay (p_num, r_seq, c_id_seq, p_amount, p_date, p_method)
+           VALUES (%s, %s, %s, %s, %s, %s)""",
+        (f"pending_{secrets.token_hex(8)}", reservation["r_seq"], reservation["c_id_seq"],
+         amount, reservation["r_date"], p_method),
+    )
+    p_seq = cursor.lastrowid
+    if not isinstance(p_seq, int) or p_seq <= 0:
+        raise RuntimeError("pay.p_seq 자동 증가값을 가져오지 못했습니다.")
+    p_num = f"{reservation['g_code']}_{p_seq}"
+    cursor.execute("UPDATE pay SET p_num = %s WHERE p_seq = %s", (p_num, p_seq))
+    return {"result": "OK", "p_seq": p_seq, "p_num": p_num, "r_seq": reservation["r_seq"],
+            "c_id_seq": reservation["c_id_seq"], "p_amount": str(amount),
+            "p_date": reservation["r_date"], "p_method": p_method}
 
 
 @router.post(
@@ -84,6 +106,7 @@ def create_payment(
             reservation = cursor.fetchone()
             if reservation is None:
                 raise HTTPException(status_code=404, detail="존재하지 않는 예약 번호입니다.")
+            reservation["r_seq"] = r_seq
             # 요청 회원과 reservation FK 회원이 일치할 때만 결제를 진행합니다.
             if reservation["c_id_seq"] != c_id_seq:
                 raise HTTPException(status_code=403, detail="본인 예약에 대해서만 결제할 수 있습니다.")
@@ -102,6 +125,8 @@ def create_payment(
             # 5. 결과·보완 : 대표 대여 결제 유지, 실제 결제 연동 검증은 별도 필요
             # ************************
             if reservation.get('reservation_category') == RESERVATION_RENTAL:
+                # 팀 매칭 모듈은 예약 모듈을 참조하므로 필요한 시점에 불러옵니다.
+                from ..team_match.lineup import guard_participant
                 guard_participant(cursor, r_seq)
 
             # 검증된 reservation FK를 pay에도 저장하고, 예약당 한 번만 결제되게 합니다.
@@ -119,36 +144,10 @@ def create_payment(
             #   구장대여(2) : 시간대 전체를 빌리므로 구장 이용금액 전체 (수용인원 1로 나눔)
             #   값이 없으면 DB 기본값과 같은 1(실력매칭)로 봄
             # 수정 일 : 2026-10-28 / 작업자 : 최현준 — DB VARCHAR와 문자열 상수로 비교합니다.
-            if reservation.get("reservation_category", RESERVATION_MATCH) == RESERVATION_RENTAL:
-                p_amount = calculate_payment_amount(reservation["g_price"], 1)
-            else:
-                p_amount = calculate_payment_amount(reservation["g_price"], reservation["g_num"])
-            # p_seq는 AI이므로, 임시 고유 번호로 INSERT한 뒤 lastrowid로 최종 p_num을 만듭니다.
-            pending_p_num = f"pending_{secrets.token_hex(8)}"
-            cursor.execute(
-                """INSERT INTO pay (p_num, r_seq, c_id_seq, p_amount, p_date, p_method)
-                   VALUES (%s, %s, %s, %s, %s, %s)""",
-                (pending_p_num, r_seq, reservation["c_id_seq"], p_amount, reservation["r_date"], p_method),
-            )
-            p_seq = cursor.lastrowid
-            if not isinstance(p_seq, int) or p_seq <= 0:
-                raise RuntimeError("pay.p_seq 자동 증가값을 가져오지 못했습니다.")
-
-            # 예: g_code=2, p_seq=1이면 p_num=2_1로 확정합니다.
-            p_num = f"{reservation['g_code']}_{p_seq}"
-            cursor.execute("UPDATE pay SET p_num = %s WHERE p_seq = %s", (p_num, p_seq))
+            result = insert_payment(cursor, reservation, p_method)
 
         connection.commit()
-        return {
-            "result": "OK",
-            "p_seq": p_seq,
-            "p_num": p_num,
-            "r_seq": r_seq,
-            "c_id_seq": reservation["c_id_seq"],
-            "p_amount": str(p_amount),
-            "p_date": reservation["r_date"],
-            "p_method": p_method,
-        }
+        return result
     except HTTPException:
         if connection is not None:
             connection.rollback()
@@ -171,3 +170,4 @@ def create_payment(
 # 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (소셜 회원 ID 입력 길이 DB 정합성 적용)
 # 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (문자열 예약 분류에 따른 대여 총액 계산)
 # 최종 수정 일 : 2026-10-30 / 작업자 : 최현준
+# 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (예약과 결제의 트랜잭션 공유)

@@ -161,4 +161,49 @@ def cancel_pending(cursor, rental):
             cursor.execute(f'UPDATE board_a_write SET {column}=%s WHERE bulletin_seq=%s AND comment_seq=%s',
                            (visible(row[column]), row['bulletin_seq'], row['comment_seq']))
 
-# 최종 수정 일 : 2026-10-30 / 작업자 : 최현준
+
+# 성사된 경기 취소 시 해당 공고의 명단만 정리합니다. 구별이 불가능하면 전체 롤백합니다.
+def cancel_confirmed(cursor, rental):
+    from .team_match_connect import to_datetime
+    cursor.execute("""SELECT bulletin_seq,board_content FROM board_a_write
+        WHERE comment_seq=0 AND board_category='매칭신청' AND board_content LIKE %s FOR UPDATE""",
+        (f"[예약번호:{rental['r_seq']}]%",))
+    posts = list(cursor.fetchall())
+    if len(posts) != 1:
+        raise HTTPException(409, '성사된 매칭 공고를 정확히 확인할 수 없습니다.')
+    post = posts[0]
+    home = unpack(post['board_content'])
+    cursor.execute("""SELECT b.comment_seq,b.comment_content,a.comment_seq AS reply_seq
+        FROM board_a_write b JOIN board_a_write a
+        ON a.bulletin_seq=b.bulletin_seq AND a.reply_to_comment_seq=b.comment_seq
+        AND a.depth=1 AND a.comment_delete_state=0 AND a.comment_content LIKE %s
+        WHERE b.bulletin_seq=%s AND b.depth=0 AND b.comment_seq>0 AND b.comment_delete_state=0 FOR UPDATE""",
+        ('%수락되었습니다.', post['bulletin_seq']))
+    accepted = list(cursor.fetchall())
+    if not home or len(accepted) != 1:
+        raise HTTPException(409, '성사된 양 팀의 출전 명단을 정확히 확인할 수 없습니다.')
+    away = unpack(accepted[0]['comment_content'])
+    if not away:
+        raise HTTPException(409, '상대 팀의 출전 명단을 확인할 수 없습니다.')
+    cursor.execute("""SELECT team_code FROM team_match WHERE home_t_id=%s AND away_t_id=%s
+        AND team_start=%s AND team_end=%s FOR UPDATE""", (home['team_id'], away['team_id'],
+        to_datetime(rental['r_date'], rental['rs_time']), to_datetime(rental['r_date'], rental['re_time'])))
+    matches = list(cursor.fetchall())
+    if len(matches) != 1:
+        raise HTTPException(409, '연결된 팀 경기 기록을 정확히 구분할 수 없습니다.')
+    for data in (home, away):
+        for row in rows_for(cursor, rental, data):
+            if row['r_seq'] != rental['r_seq']:
+                cursor.execute('DELETE FROM reservation WHERE r_seq=%s', (row['r_seq'],))
+    cursor.execute('DELETE FROM team_match WHERE team_code=%s', (matches[0]['team_code'],))
+    cursor.execute('UPDATE board_a_write SET board_content=%s WHERE bulletin_seq=%s AND comment_seq=0',
+                   (visible(post['board_content']), post['bulletin_seq']))
+    cursor.execute('UPDATE board_a_write SET comment_content=%s WHERE bulletin_seq=%s AND comment_seq=%s',
+                   (visible(accepted[0]['comment_content']), post['bulletin_seq'], accepted[0]['comment_seq']))
+    cursor.execute("UPDATE board_a_write SET comment_content='팀매칭이 취소되었습니다.' WHERE bulletin_seq=%s AND comment_seq=%s",
+                   (post['bulletin_seq'], accepted[0]['reply_seq']))
+    cursor.execute("UPDATE board_a_write SET comment_content='팀매칭이 취소되었습니다.' WHERE bulletin_seq=%s AND reply_to_comment_seq=%s AND depth=2",
+                   (post['bulletin_seq'], accepted[0]['reply_seq']))
+    cursor.execute('UPDATE reservation SET r_check=0 WHERE r_seq=%s', (rental['r_seq'],))
+
+# 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (성사 경기 및 양 팀 출전 정리)

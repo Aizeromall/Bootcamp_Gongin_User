@@ -1,6 +1,7 @@
 // 작업자 : 최현준 / 최초 작업 일 : 2026-10-29
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 
 import '../../vm/account_state.dart';
 import '../../vm/member_state.dart';
@@ -307,11 +308,22 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
                         maxLength: limits[key],
                         decoration: InputDecoration(labelText: labels[key]),
                         keyboardType: key == 'c_phone'
-                            ? TextInputType.phone
+                            ? TextInputType.number
                             : TextInputType.text,
-                        validator: (value) => (value ?? '').trim().isEmpty
-                            ? '${labels[key]}을(를) 입력해 주세요.'
+                        // 수정 일 : 2026-10-30 / 작업자 : 최현준 — 전화번호 입력과 붙여넣기에서 숫자만 허용합니다.
+                        inputFormatters: key == 'c_phone'
+                            ? [FilteringTextInputFormatter.digitsOnly]
                             : null,
+                        validator: (value) {
+                          if ((value ?? '').trim().isEmpty) {
+                            return '${labels[key]}을(를) 입력해 주세요.';
+                          }
+                          if (key == 'c_phone' &&
+                              !RegExp(r'^[0-9]+$').hasMatch(value!)) {
+                            return '전화번호는 숫자만 입력해 주세요.';
+                          }
+                          return null;
+                        },
                       ),
                     ),
                   const Text(
@@ -450,3 +462,4 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
   }
 }
 // 최종 수정 일 : 2026-10-29 / 작업자 : 최현준
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준

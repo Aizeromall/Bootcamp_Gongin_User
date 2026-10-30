@@ -150,7 +150,7 @@ class _BoardMatchCardState extends ConsumerState<BoardMatchCard> {
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: MemberStyle.surface,
+              color: Theme.of(context).colorScheme.surfaceContainerHigh,
               borderRadius: BorderRadius.circular(18),
               border: Border.all(color: MemberStyle.line),
             ),
@@ -324,3 +324,4 @@ class _BoardMatchCardState extends ConsumerState<BoardMatchCard> {
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
 // 최종 수정 일 : 2026-10-30 / 작업자 : 최현준
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (테마 대비 적용)

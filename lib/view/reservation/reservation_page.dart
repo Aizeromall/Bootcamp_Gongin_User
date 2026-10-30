@@ -8,14 +8,21 @@ import '../payment/payment_page.dart';
 import '../shared/api_content.dart';
 import '../shared/member_components.dart';
 import '../shared/member_style.dart';
+import '../shared/ground_price.dart';
 import '../shared/ui.dart';
 
 // 수정 일 : 2026-10-28 / 작업자 : 양태건
 // 날짜·시간 그리드를 Riverpod 조회로 구성하고 전체 대여와 개인 예약 API를 분리합니다.
 class ReservationPage extends ConsumerStatefulWidget {
-  const ReservationPage({super.key, required this.ground, this.rental = false});
+  const ReservationPage({
+    super.key,
+    required this.ground,
+    this.rental = false,
+    this.initialDate,
+  });
   final Map<String, dynamic> ground;
   final bool rental;
+  final DateTime? initialDate;
   @override
   ConsumerState<ReservationPage> createState() => _ReservationPageState();
 }
@@ -24,6 +31,14 @@ class _ReservationPageState extends ConsumerState<ReservationPage> {
   DateTime date = DateUtils.dateOnly(DateTime.now());
   String? time;
   bool busy = false;
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialDate != null) {
+      date = DateUtils.dateOnly(widget.initialDate!);
+    }
+  }
+
   ApiQuery get query => apiQuery(
     widget.rental
         ? '/ground/reservation/slots/${widget.ground['g_code']}'
@@ -32,41 +47,38 @@ class _ReservationPageState extends ConsumerState<ReservationPage> {
   );
   Future<void> reserve() async {
     if (busy || time == null) return;
-    setState(() => busy = true);
     final id = ref.read(memberIdProvider);
+    setState(() => busy = true);
     try {
-      final result = await ref
-          .read(memberApiProvider)
-          .request(
-            widget.rental ? '/ground/reservation' : '/match/reservation',
-            body: {
+      final price = num.tryParse('${widget.ground['g_price']}');
+      final estimate = price == null
+          ? null
+          : widget.rental
+          ? price.round()
+          : individualGroundPrice(
+              widget.ground['g_price'],
+              widget.ground['g_num'],
+            );
+      final completed = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute<bool>(
+          builder: (_) => PaymentPage(
+            memberId: id,
+            groundName: '${widget.ground['g_name']}',
+            expectedAmount: estimate,
+            reservationPath: widget.rental
+                ? '/ground/reservation'
+                : '/match/reservation',
+            reservationBody: {
               'c_id_seq': id,
               'g_code': '${widget.ground['g_code']}',
               'r_date': day(date),
               'rs_time': time,
             },
-          );
-      if (!mounted) return;
-      final price = num.tryParse('${widget.ground['g_price']}');
-      final capacity = num.tryParse('${widget.ground['g_num']}');
-      final estimate = price == null
-          ? null
-          : widget.rental
-          ? price.round()
-          : capacity != null && capacity > 0
-          ? (price / capacity).round()
-          : null;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute<void>(
-          builder: (_) => PaymentPage(
-            rSeq: result['r_seq'] as int,
-            memberId: id,
-            groundName: '${widget.ground['g_name']}',
-            expectedAmount: estimate,
           ),
         ),
       );
+      if (mounted && completed == true) Navigator.pop(context, true);
     } catch (error) {
       if (mounted) {
         showMessage(context, error);
@@ -87,7 +99,7 @@ class _ReservationPageState extends ConsumerState<ReservationPage> {
         padding: const EdgeInsets.all(16),
         child: FilledButton(
           onPressed: busy || time == null ? null : reserve,
-          child: Text(busy ? '예약 중…' : '예약하고 결제 선택'),
+          child: Text(busy ? '결제 화면 이동 중…' : '결제 수단 선택'),
         ),
       ),
     ),
@@ -107,13 +119,23 @@ class _ReservationPageState extends ConsumerState<ReservationPage> {
                 ),
               ),
               const SizedBox(height: 6),
+              // 수정 일 : 2026-10-30 / 작업자 : 최현준
+              // 구장 주소와 예약 유형을 작은 화면에서도 읽기 쉽게 표시합니다.
               Text(
                 '${widget.ground['g_address']}',
-                style: const TextStyle(fontSize: 12, color: MemberStyle.muted),
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.5,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
               Text(
                 '${sports[ref.watch(sportProvider)]} · ${widget.rental ? '전체 대여' : '1인 자리 예약'} · 2시간',
-                style: const TextStyle(fontSize: 12, color: MemberStyle.blue),
+                style: const TextStyle(
+                  fontSize: 13,
+                  height: 1.5,
+                  color: MemberStyle.blue,
+                ),
               ),
             ],
           ),
@@ -212,10 +234,12 @@ class _ReservationPageState extends ConsumerState<ReservationPage> {
                     final selected = time == start;
                     return Material(
                       color: disabled
-                          ? MemberStyle.surface
+                          ? Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest
                           : selected
-                          ? const Color(0xFFEAF1FF)
-                          : Colors.white,
+                          ? Theme.of(context).colorScheme.primaryContainer
+                          : Theme.of(context).colorScheme.surfaceContainerHigh,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                         side: BorderSide(
@@ -234,7 +258,9 @@ class _ReservationPageState extends ConsumerState<ReservationPage> {
                               start,
                               style: TextStyle(
                                 fontWeight: FontWeight.w700,
-                                color: disabled ? Colors.grey : MemberStyle.ink,
+                                color: disabled
+                                    ? Theme.of(context).disabledColor
+                                    : Theme.of(context).colorScheme.onSurface,
                               ),
                             ),
                             Text(
@@ -263,7 +289,7 @@ class _ReservationPageState extends ConsumerState<ReservationPage> {
         ),
         const SizedBox(height: 20),
         const Text(
-          '예약 후 결제 내역을 저장할 수 있습니다. 결제를 미룬 예약은 내 예약에서 이어서 진행하세요.',
+          '결제 기록을 저장하면 예약이 함께 확정됩니다. 실제 결제 승인은 진행되지 않습니다.',
           style: TextStyle(fontSize: 12, color: MemberStyle.muted, height: 1.7),
         ),
       ],
@@ -271,3 +297,7 @@ class _ReservationPageState extends ConsumerState<ReservationPage> {
   );
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (예약 화면 테마 대비 적용)
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준

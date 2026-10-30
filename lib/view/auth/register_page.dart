@@ -2,6 +2,7 @@
 // 최초 작업 일 : 2026-10-24
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 
 import '../../vm/member_state.dart';
 import '../../vm/social_login_state.dart';
@@ -116,6 +117,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       key: ValueKey(key),
       controller: fields[key],
       enabled: !busy,
+      // 수정 일 : 2026-10-30 / 작업자 : 최현준 — 일반·간편가입 전화번호는 숫자만 입력합니다.
+      keyboardType: key == 'c_phone' ? TextInputType.number : null,
+      inputFormatters: key == 'c_phone'
+          ? [FilteringTextInputFormatter.digitsOnly]
+          : null,
       obscureText: key == 'c_pw',
       maxLength: {
         'c_id': 40,
@@ -127,6 +133,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       decoration: InputDecoration(labelText: label),
       validator: (value) {
         if ((value ?? '').trim().isEmpty) return '필수 입력 항목입니다.';
+        if (key == 'c_phone' && !RegExp(r'^[0-9]+$').hasMatch(value!)) {
+          return '전화번호는 숫자만 입력해 주세요.';
+        }
         if (key == 'c_pw' && value!.length < 8) return '8자 이상 입력해 주세요.';
         return null;
       },
@@ -287,3 +296,4 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
 // 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (간편가입 화면 재사용)
 // 최종 수정 일 : 2026-10-29 / 작업자 : 최현준 (공통 종목 포지션 재사용)
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준

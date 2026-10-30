@@ -218,7 +218,7 @@ def test_worker_recovers_leases_expires_events_and_releases_lock():
 def test_reservation_confirmation_outbox_is_atomic():
     for fail in (False, True):
         connection, cursor = db()
-        cursor.fetchone.side_effect = [{"g_code": 1, "g_num": 2}, {"exists": 1}, None, None, None,
+        cursor.fetchone.side_effect = [{"g_code": 1, "g_num": 2, "g_price": 10000}, {"exists": 1}, None, None, None,
                                        {"reservation_count": 1}]
         cursor.lastrowid = 7
         with patch.object(reservation_api, "connect", return_value=connection), \
@@ -226,14 +226,14 @@ def test_reservation_confirmation_outbox_is_atomic():
                 patch.object(reservation_api.logger, "exception"):
             if fail:
                 try:
-                    reservation_api.create_reservation("member_01", "1", AT.date(), "10:00")
+                    reservation_api.create_reservation("member_01", "1", AT.date(), "10:00", "카카오페이")
                     raise AssertionError("must rollback")
                 except Exception as error:
                     assert getattr(error, "status_code", None) == 500
                 connection.rollback.assert_called_once()
                 connection.commit.assert_not_called()
             else:
-                assert reservation_api.create_reservation("member_01", "1", AT.date(), "10:00")["r_check"]
+                assert reservation_api.create_reservation("member_01", "1", AT.date(), "10:00", "카카오페이")["r_check"]
                 connection.commit.assert_called_once()
             enqueue.assert_called_once_with(cursor, "1", AT.date(), "10:00")
 
