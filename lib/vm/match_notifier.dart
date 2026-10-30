@@ -8,20 +8,38 @@ import 'member_features.dart';
 
 // 수정 일 : 2026-10-27 / 작업자 : 양태건
 // 구장 화면과 같은 서비스·API_BASE_URL·캐시를 사용합니다.
-final groundListProvider = FutureProvider.autoDispose<List<Ground>>((
-  ref,
-) async {
-  final data = await ref.watch(apiDocumentProvider(apiQuery('/ground')).future);
-  return apiRows(data).map(Ground.fromJson).toList();
-});
-final groundDetailProvider = FutureProvider.autoDispose.family<Ground, String>((
-  ref,
-  code,
-) async {
-  final data = await ref.watch(
-    apiDocumentProvider(apiQuery('/ground/${Uri.encodeComponent(code)}'))
-        .future,
-  );
-  return Ground.fromJson(data);
-});
+// 수정 일 : 2026-10-30 / 작업자 : 신현진
+// 상태관리 방식 변경: FutureProvider → AsyncNotifier (조회 로직·키·autoDispose는 그대로)
+class GroundListNotifier extends AsyncNotifier<List<Ground>> {
+  @override
+  Future<List<Ground>> build() async {
+    final data = await ref.watch(
+      apiDocumentProvider(apiQuery('/ground')).future,
+    );
+    return apiRows(data).map(Ground.fromJson).toList();
+  }
+}
+
+final groundListProvider =
+    AsyncNotifierProvider.autoDispose<GroundListNotifier, List<Ground>>(
+      GroundListNotifier.new,
+    );
+
+class GroundDetailNotifier extends AsyncNotifier<Ground> {
+  GroundDetailNotifier(this.code);
+  final String code;
+
+  @override
+  Future<Ground> build() async {
+    final data = await ref.watch(
+      apiDocumentProvider(apiQuery('/ground/${Uri.encodeComponent(code)}'))
+          .future,
+    );
+    return Ground.fromJson(data);
+  }
+}
+
+final groundDetailProvider = AsyncNotifierProvider.autoDispose
+    .family<GroundDetailNotifier, Ground, String>(GroundDetailNotifier.new);
 // 최종 수정 일 : 2026-10-27 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-30 / 작업자 : 신현진 (조회 provider AsyncNotifier 변환)
