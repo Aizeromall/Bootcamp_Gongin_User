@@ -170,7 +170,9 @@ void main() {
     });
     pending.complete(response({'result': 'OK'}, 201));
     expect(await first, false);
-    expect(container.read(captainTransferProvider(key)), false);
+    // 수정 일 : 2026-10-31 / 작업자 : 신현진 — AsyncNotifier 변환으로 처리 중 여부는 isLoading
+    expect(container.read(captainTransferProvider(key)).isLoading, false);
   });
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-31 / 작업자 : 신현진 (동작 Notifier AsyncNotifier 변환에 맞춰 isLoading 사용)

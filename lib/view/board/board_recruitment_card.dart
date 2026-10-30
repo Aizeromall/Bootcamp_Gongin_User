@@ -37,7 +37,10 @@ class _BoardRecruitmentCardState extends ConsumerState<BoardRecruitmentCard> {
     String action,
     String? applicant,
   ) async {
-    if (confirming || ref.read(recruitmentActionProvider(key))) return;
+    // 수정 일 : 2026-10-31 / 작업자 : 신현진 — AsyncNotifier 변환으로 처리 중 여부는 isLoading
+    if (confirming || ref.read(recruitmentActionProvider(key)).isLoading) {
+      return;
+    }
     setState(() {
       confirming = true;
       error = null;
@@ -98,7 +101,8 @@ class _BoardRecruitmentCardState extends ConsumerState<BoardRecruitmentCard> {
       );
     }
     final key = (seq: widget.seq, id: id, teamId: widget.teamId);
-    final submitting = ref.watch(recruitmentActionProvider(key));
+    // 수정 일 : 2026-10-31 / 작업자 : 신현진 — 처리 중 여부는 isLoading
+    final submitting = ref.watch(recruitmentActionProvider(key)).isLoading;
     final busy = confirming || submitting;
     return Container(
       margin: const EdgeInsets.all(16),
@@ -256,3 +260,4 @@ class _BoardRecruitmentCardState extends ConsumerState<BoardRecruitmentCard> {
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
 // 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (테마 대비 적용)
+// 최종 수정 일 : 2026-10-31 / 작업자 : 신현진 (동작 Notifier AsyncNotifier 변환에 맞춰 isLoading 사용)

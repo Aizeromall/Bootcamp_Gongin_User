@@ -134,7 +134,9 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
 
   Future<void> save() async {
     if (ref.read(sessionProvider)?['c_id'] != owner) return;
-    if (ref.read(accountActionsProvider) || !form.currentState!.validate()) {
+    // 수정 일 : 2026-10-31 / 작업자 : 신현진 — AsyncNotifier 변환으로 처리 중 여부는 isLoading
+    if (ref.read(accountActionsProvider).isLoading ||
+        !form.currentState!.validate()) {
       return;
     }
     final changes = <String, dynamic>{};
@@ -211,7 +213,8 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
   }
 
   Future<void> withdraw() async {
-    if (confirming || ref.read(accountActionsProvider)) return;
+    // 수정 일 : 2026-10-31 / 작업자 : 신현진 — 처리 중 여부는 isLoading
+    if (confirming || ref.read(accountActionsProvider).isLoading) return;
     final before = ref.read(sessionProvider);
     if (before?['c_id'] != owner) return;
     confirming = true;
@@ -268,7 +271,8 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
 
   @override
   Widget build(BuildContext context) {
-    final busy = ref.watch(accountActionsProvider);
+    // 수정 일 : 2026-10-31 / 작업자 : 신현진 — 처리 중 여부는 isLoading
+    final busy = ref.watch(accountActionsProvider).isLoading;
     return PopScope(
       canPop: !busy,
       child: Center(
@@ -463,3 +467,4 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
 }
 // 최종 수정 일 : 2026-10-29 / 작업자 : 최현준
 // 최종 수정 일 : 2026-10-30 / 작업자 : 최현준
+// 최종 수정 일 : 2026-10-31 / 작업자 : 신현진 (동작 Notifier AsyncNotifier 변환에 맞춰 isLoading 사용)
