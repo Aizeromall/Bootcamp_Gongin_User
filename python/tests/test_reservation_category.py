@@ -42,7 +42,7 @@ def test_constants_and_sql_conditions_are_strict_strings():
 def test_payment_string_category_uses_rental_total_or_individual_share():
     for category, amount in [("1", "1000"), ("2", "10000")]:
         connection, cursor = database()
-        cursor.fetchone.side_effect = [row(category), None]
+        cursor.fetchone.side_effect = [row(category), None] if category == '1' else [row(category), None, None]
         with patch.object(payment, "connect", return_value=connection):
             result = payment.create_payment(7, "member_01", "카카오페이")
         assert result["p_amount"] == amount
@@ -67,7 +67,8 @@ def test_existing_string_category_blocks_rental_before_insert():
 
 def test_rental_cancel_accepts_string_two():
     connection, cursor = database()
-    cursor.fetchone.side_effect = [row("2"), None]
+    cursor.fetchone.side_effect = [row("2"), None, row("2"), None]
+    cursor.fetchall.return_value = []
     with patch.object(rental, "connect", return_value=connection):
         result = rental.cancel_ground_reservation(7, "가상 취소 사유", "member_01")
     assert result["reservation_category"] == "2"
@@ -121,3 +122,4 @@ def load_tests(loader, tests, pattern):
                               if name.startswith("test_") and callable(fn))
 
 # 최종 수정 일 : 2026-10-28
+# 최종 수정 일 : 2026-10-30 / 작업자 : 최현준

@@ -42,6 +42,8 @@ class InsertBoardRequest(BoardTextRequest):
 # 3. 게시글 작성: 회원 확인 후 작성일은 NOW(), 조회 수는 0으로 저장합니다.
 @router.post("/insert", status_code=status.HTTP_201_CREATED, summary="게시글 작성")
 def insert_board(payload: InsertBoardRequest):
+    if '[출전예약:' in payload.board_content or '[출전정보:' in payload.board_content:
+        raise HTTPException(status_code=422, detail='게시글에 사용할 수 없는 문구입니다.')
     # 수정 일 : 2026-10-26 / 작업자 : 양태건
     # 이 기능에서 직접 연결하고, 실패 시 롤백한 뒤 연결을 해제합니다.
     connection = None
@@ -81,3 +83,4 @@ def insert_board(payload: InsertBoardRequest):
     return {"result": "OK", "bulletin_seq": bulletin_seq}
 
 # 최종 수정 일 : 2026-10-26 / 작업자 : 양태건
+# 최종 수정 일 : 2026-10-30 / 작업자 : 최현준

@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ..database import connect
 from ..team_match.team_match_connect import BOARD_CATEGORY_TEAM_MATCH, POST_RESERVATION_PATTERN
+from ..team_match.lineup import unpack, visible
 
 # 수정 일 : 2026-10-26 / 작업자 : 양태건
 # 실제 DB board_a_write 사용: comment_seq=0은 게시글, 양수는 댓글입니다.
@@ -107,6 +108,8 @@ def select_comments(bulletin_seq: int = Path(gt=0)):
     finally:
         if connection is not None:
             connection.close()
+    for row in rows:
+        row['comment_content'] = visible(row.get('comment_content'))
     return {"total": len(rows), "results": rows}
 
 
@@ -129,6 +132,8 @@ def insert_comment(
     }),
     bulletin_seq: int = Path(gt=0),
 ):
+    if '[출전예약:' in payload.comment_content or '[출전정보:' in payload.comment_content:
+        raise HTTPException(status_code=422, detail='댓글에 사용할 수 없는 문구입니다.')
     # 수정 일 : 2026-10-26 / 작업자 : 양태건
     # 이 기능에서 직접 연결하고, 실패 시 롤백한 뒤 연결을 해제합니다.
     connection = None
@@ -224,6 +229,8 @@ def update_comment(
     comment_seq: int = Path(gt=0),
     bulletin_seq: int = Query(gt=0, description="댓글이 속한 게시글 번호 (복합 PK)"),
 ):
+    if '[출전예약:' in payload.comment_content or '[출전정보:' in payload.comment_content:
+        raise HTTPException(status_code=422, detail='댓글에 사용할 수 없는 문구입니다.')
     # 수정 일 : 2026-10-26 / 작업자 : 양태건
     # 이 기능에서 직접 연결하고, 실패 시 롤백한 뒤 연결을 해제합니다.
     connection = None
@@ -235,7 +242,7 @@ def update_comment(
             if cursor.fetchone() is None:
                 raise HTTPException(status_code=404, detail="존재하지 않는 회원입니다.")
             cursor.execute(
-                "SELECT comment_seq, c_id_seq, comment_delete_state FROM board_a_write WHERE bulletin_seq = %s AND comment_seq = %s AND comment_seq > 0 FOR UPDATE",
+                "SELECT comment_seq, c_id_seq, comment_delete_state, comment_content FROM board_a_write WHERE bulletin_seq = %s AND comment_seq = %s AND comment_seq > 0 FOR UPDATE",
                 (bulletin_seq, comment_seq),
             )
             row = cursor.fetchone()
@@ -243,6 +250,8 @@ def update_comment(
                 raise HTTPException(status_code=404, detail="존재하지 않는 댓글입니다.")
             if row["c_id_seq"] != payload.c_id_seq:
                 raise HTTPException(status_code=403, detail="본인 댓글만 수정할 수 있습니다.")
+            if unpack(row.get('comment_content')):
+                raise HTTPException(status_code=409, detail='출전 예약이 연결된 신청은 수정할 수 없습니다.')
             if row["comment_delete_state"]:
                 raise HTTPException(status_code=409, detail="삭제된 댓글은 수정할 수 없습니다.")
             cursor.execute(
@@ -291,7 +300,7 @@ def delete_comment(
             if cursor.fetchone() is None:
                 raise HTTPException(status_code=404, detail="존재하지 않는 회원입니다.")
             cursor.execute(
-                "SELECT comment_seq, c_id_seq, comment_delete_state FROM board_a_write WHERE bulletin_seq = %s AND comment_seq = %s AND comment_seq > 0 FOR UPDATE",
+                "SELECT comment_seq, c_id_seq, comment_delete_state, comment_content FROM board_a_write WHERE bulletin_seq = %s AND comment_seq = %s AND comment_seq > 0 FOR UPDATE",
                 (bulletin_seq, comment_seq),
             )
             row = cursor.fetchone()
@@ -299,6 +308,8 @@ def delete_comment(
                 raise HTTPException(status_code=404, detail="존재하지 않는 댓글입니다.")
             if row["c_id_seq"] != c_id_seq:
                 raise HTTPException(status_code=403, detail="본인 댓글만 삭제할 수 있습니다.")
+            if unpack(row.get('comment_content')):
+                raise HTTPException(status_code=409, detail='출전 예약이 연결된 신청은 삭제할 수 없습니다.')
             if row["comment_delete_state"]:
                 raise HTTPException(status_code=409, detail="이미 삭제된 댓글입니다.")
             cursor.execute(
@@ -326,3 +337,4 @@ def delete_comment(
     return {"result": "OK", "bulletin_seq": bulletin_seq, "comment_seq": comment_seq, "comment_delete_state": True}
 
 # 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+# 최종 수정 일 : 2026-10-30 / 작업자 : 최현준

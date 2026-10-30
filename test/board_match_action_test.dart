@@ -31,6 +31,7 @@ ProviderContainer setup(Future<http.Response> Function(http.Request) handler) {
     'c_id': 'member',
     'c_name': '회원',
     'preferred_stocks': [1],
+    'access_token': 'mock-token',
   });
   addTearDown(() {
     container.dispose();
@@ -73,9 +74,18 @@ void main() {
         expect(jsonDecode(r.body), {
           'c_id_seq': 'member_01',
           'bulletin_seq': 10,
+          'member_ids': ['member_01'],
         });
         requested = true;
         return result({'result': 'OK'}, 201);
+      }
+      if (r.url.path == '/team_match/lineup-options') {
+        return result({
+          'required_count': 1,
+          'results': [
+            {'c_id_seq': 'member_01', 'c_name': '회원'},
+          ],
+        });
       }
       return result({'results': []});
     });
@@ -83,7 +93,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, '매칭신청'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('확인'));
+    await tester.tap(find.byType(CheckboxListTile));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('선택 완료'));
     await tester.pumpAndSettle();
     expect(requests, 1);
     expect(detailReads, 0);
@@ -194,3 +206,4 @@ void main() {
   });
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준

@@ -40,7 +40,9 @@ from datetime import date, datetime, time, timedelta
 from typing import Annotated, Optional
 
 import pymysql
-from fastapi import APIRouter, Body, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from ..auth.token import current_account
+from . import lineup
 
 from ..database import connect  # 공용 DB 연결 함수 (python/FastAPI/database.py)
 # 구장대여 예약과 같은 기준을 쓰기 위해 match 폴더의 공용 값·함수를 가져옴
@@ -56,6 +58,106 @@ from ..match.reservation_status import RESERVATION_RENTAL, category_condition, r
 # 가입 상태는 가입으로 저장하며 기존 가입일 데이터는 조회 호환만 유지합니다.
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def own_actor(account, member):
+    if member not in account['member_ids']:
+        raise HTTPException(403, '본인 계정으로만 팀 매칭을 처리할 수 있습니다.')
+
+
+@router.get('/lineup-options', summary='예약 또는 공고의 정원 및 내 팀 출전자 선택 목록', responses={
+    401: {'description': '로그인 필요'}, 403: {'description': '본인 팀장 아님'},
+    404: {'description': '예약·공고 없음'}, 409: {'description': '정원 설정 오류'},
+    422: {'description': '예약번호 또는 게시글번호 중 하나만 입력'}, 500: {'description': 'DB 조회 실패'},
+})
+def lineup_options(c_id_seq: str, r_seq: int | None = None, bulletin_seq: int | None = None,
+                   account: dict = Depends(current_account)):
+    own_actor(account, c_id_seq)
+    if (r_seq is None) == (bulletin_seq is None):
+        raise HTTPException(422, '예약번호 또는 공고번호 중 하나를 입력해 주세요.')
+    connection = None
+    try:
+        connection = connect()
+        with connection.cursor() as cursor:
+            team = find_captain_team(cursor, c_id_seq)
+            if not team:
+                raise HTTPException(403, '팀장만 출전자를 선택할 수 있습니다.')
+            if bulletin_seq is not None:
+                cursor.execute(POST_SELECT + ' AND b.bulletin_seq=%s',
+                               (BOARD_CATEGORY_TEAM_MATCH, '[예약번호:%', bulletin_seq))
+            else:
+                cursor.execute("""SELECT r.*,g.g_num,g.g_name FROM reservation r JOIN ground g ON g.g_code=r.g_code
+                    WHERE r.r_seq=%s AND r.c_id_seq=%s AND r.reservation_category='2'""", (r_seq, c_id_seq))
+            rental = cursor.fetchone()
+            if not rental:
+                raise HTTPException(404, '연결된 구장대여를 찾을 수 없습니다.')
+            return {'required_count': lineup.required_count(rental['g_num']), 't_id': team['t_id'],
+                    'g_code': rental['g_code'], 'g_name': rental['g_name'], 'r_seq': rental['r_seq'],
+                    'results': lineup.team_members(cursor, team['t_id'])}
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(500, '출전자 목록 조회에 실패했습니다.') from None
+    finally:
+        if connection is not None:
+            connection.close()
+
+
+@router.get('/confirmed/{r_seq}', summary='확정된 팀 경기와 출전자 명단 조회', responses={
+    401: {'description': '로그인 필요'}, 403: {'description': '경기 참여자가 아님'},
+    404: {'description': '확정 경기 없음'}, 409: {'description': '명단 연결 정보 없음'},
+    500: {'description': 'DB 조회 실패'},
+})
+def confirmed_lineup(r_seq: int, account: dict = Depends(current_account)):
+    connection = None
+    try:
+        connection = connect()
+        with connection.cursor() as cursor:
+            cursor.execute(POST_SELECT + ' AND r.r_seq=%s AND r.r_check=1',
+                           (BOARD_CATEGORY_TEAM_MATCH, '[예약번호:%', r_seq))
+            post = cursor.fetchone()
+            if not post:
+                raise HTTPException(404, '확정된 팀 경기를 찾을 수 없습니다.')
+            home = lineup.unpack(post['board_content'])
+            cursor.execute("""SELECT comment_seq,c_id_seq,comment_content FROM board_a_write
+                WHERE bulletin_seq=%s AND comment_seq>0 AND depth=0 AND comment_delete_state=0""",
+                (post['bulletin_seq'],))
+            requests = list(cursor.fetchall())
+            accepted = [item for item in requests
+                        if request_status(cursor, post['bulletin_seq'], item['comment_seq']) == STATUS_ACCEPTED]
+            away = lineup.unpack(accepted[0]['comment_content']) if len(accepted) == 1 else None
+            if not home or not away:
+                raise HTTPException(409, '확정된 출전 명단을 확인할 수 없습니다.')
+            if not set(account['member_ids']) & (set(home['members']) | set(away['members'])
+                                                 | {post['c_id_seq'], accepted[0]['c_id_seq']}):
+                raise HTTPException(403, '경기 참여자만 출전 명단을 확인할 수 있습니다.')
+            teams = []
+            for data in (home, away):
+                ids = data['reservations']
+                cursor.execute('SELECT t_name FROM team WHERE t_id=%s', (data['team_id'],))
+                team = cursor.fetchone()
+                if team is None:
+                    raise HTTPException(409, '확정된 팀 정보를 확인할 수 없습니다.')
+                cursor.execute("SELECT r.r_seq,r.c_id_seq,c.c_name,c.c_position FROM reservation r "
+                    "JOIN customer c ON c.c_id_seq=r.c_id_seq WHERE r.r_seq IN ("
+                    + ','.join(['%s'] * len(ids)) + ") AND r.r_check=1 AND r.g_code=%s "
+                    "AND r.r_date=%s AND r.rs_time=%s AND r.re_time=%s ORDER BY c.c_name,r.r_seq",
+                    (*ids, post['g_code'], post['r_date'], post['rs_time'], post['re_time']))
+                members = list(cursor.fetchall())
+                if len(members) != len(ids) or {m['c_id_seq'] for m in members} != set(data['members']):
+                    raise HTTPException(409, '확정된 출전 예약을 확인할 수 없습니다.')
+                teams.append({'t_id': data['team_id'], 't_name': team['t_name'], 'members': members})
+            return {'r_seq': r_seq, 'bulletin_seq': post['bulletin_seq'], 'g_code': post['g_code'],
+                    'g_name': post['g_name'], 'r_date': post['r_date'],
+                    'rs_time': format_time(post['rs_time']), 're_time': format_time(post['re_time']),
+                    'home': teams[0], 'away': teams[1]}
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(500, '확정된 출전 명단 조회에 실패했습니다.') from None
+    finally:
+        if connection is not None:
+            connection.close()
 
 # 게시판 카테고리 이름 (board_a_write.board_category)
 BOARD_CATEGORY_TEAM_MATCH = "매칭신청"
@@ -220,7 +322,7 @@ def post_to_dict(row: dict, team: dict | None) -> dict:
         "event_category": row["event_category"],      # 종목
         "board_title": row["board_title"],            # 제목
         # 내용 (첫 줄의 [예약번호:..] 표시는 빼고 보냄)
-        "board_content": POST_RESERVATION_PATTERN.sub("", content).lstrip("\n"),
+        "board_content": POST_RESERVATION_PATTERN.sub("", lineup.visible(content)).lstrip("\n"),
         "board_date": row["board_date"],              # 작성일
         "r_seq": row["r_seq"],                        # 연결된 구장대여 예약번호
         "g_code": row["g_code"],                      # 구장코드
@@ -249,6 +351,7 @@ def select_team_match_rentals(c_id_seq: str):
                     FROM reservation AS r
                     INNER JOIN ground AS g ON g.g_code = r.g_code
                     WHERE r.c_id_seq = %s AND {reservation_type_condition(RESERVATION_RENTAL, 'r')}
+                        AND NOT {lineup.participant_condition('r')}
                         AND {category_condition(False, 'r')} AND r.r_check = 0 AND r.r_date >= CURDATE()
                     ORDER BY r.r_date, r.rs_time""",
                 (c_id_seq,),
@@ -296,17 +399,23 @@ def select_team_match_rentals(c_id_seq: str):
     "/post",
     status_code=status.HTTP_201_CREATED,
     responses={
+        401: {"description": "로그인 정보가 없거나 만료됨"},
         403: {"description": "팀장이 아니거나 본인 구장대여가 아님"},
         404: {"description": "구장대여 예약이 존재하지 않음"},
         409: {"description": "취소·성사·지난 대여이거나 이미 매칭신청 글을 쓴 대여"},
+        422: {"description": "선택 인원·요청 형식 오류"},
+        500: {"description": "출전 예약 또는 게시글 DB 처리 실패"},
     },
 )
 def create_team_match_post(
     c_id_seq: Annotated[str, Body(min_length=4, max_length=50, description="글을 쓰는 회원 (팀장)")],
     r_seq: Annotated[int, Body(gt=0, description="연결할 구장대여 예약번호")],
+    member_ids: Annotated[list[str], Body(description='구장 정원의 절반에 해당하는 출전자 회원 ID 목록')],
     board_content: Annotated[Optional[str], Body(max_length=1000, description="추가로 적을 내용 (선택)")] = None,
+    account: dict = Depends(current_account),
 ):
     c_id_seq = c_id_seq.strip()  # 앞뒤 공백 제거
+    own_actor(account, c_id_seq)
     sport_name = sport_from_customer_id(c_id_seq)  # c_id_seq 끝 번호로 종목 확인 (형식이 틀리면 400)
     connection = None
     try:
@@ -319,10 +428,10 @@ def create_team_match_post(
 
             # 2) 구장대여 예약 확인 (본인 · 구장대여 · 취소 안 됨 · 성사 전 · 오늘 이후)
             cursor.execute(
-                f"""SELECT r.r_seq, r.c_id_seq, r.r_date, r.rs_time, r.re_time, r.r_check, g.g_name
+                f"""SELECT r.r_seq, r.c_id_seq, r.g_code, r.r_date, r.rs_time, r.re_time, r.r_check, g.g_name, g.g_num
                     FROM reservation AS r
                     INNER JOIN ground AS g ON g.g_code = r.g_code
-                    WHERE r.r_seq = %s AND {reservation_type_condition(RESERVATION_RENTAL, 'r')}""",
+                    WHERE r.r_seq = %s AND {reservation_type_condition(RESERVATION_RENTAL, 'r')} FOR UPDATE""",
                 (r_seq,),
             )
             rental = cursor.fetchone()
@@ -330,6 +439,7 @@ def create_team_match_post(
                 raise HTTPException(status_code=404, detail="존재하지 않는 구장대여 예약입니다.")
             if rental["c_id_seq"] != c_id_seq:
                 raise HTTPException(status_code=403, detail="본인 구장대여로만 매칭신청 글을 쓸 수 있습니다.")
+            lineup.guard_participant(cursor, r_seq)
             if not is_rental_open(cursor, rental):
                 raise HTTPException(status_code=409, detail="취소·성사되었거나 지난 구장대여입니다.")
 
@@ -349,6 +459,10 @@ def create_team_match_post(
             title = (f"[{BOARD_CATEGORY_TEAM_MATCH}] {rental['g_name']} "
                      f"{rental['r_date'].month}/{rental['r_date'].day} {format_time(rental['rs_time'])}")
             content = mark if not (board_content and board_content.strip()) else f"{mark}\n{board_content.strip()}"
+            # 수정 일 : 2026-10-30 / 작업자 : 최현준 — 공고·명단·예약을 한 트랜잭션으로 저장합니다.
+            if '[출전예약:' in content or '[출전정보:' in content:
+                raise HTTPException(422, '추가 내용에 시스템 연결 표식을 입력할 수 없습니다.')
+            content = lineup.pack(content, lineup.store(cursor, rental, team['t_id'], member_ids, use_anchor=True))
             cursor.execute(
                 """INSERT INTO board_a_write
                     (comment_seq, c_id_seq, event_category, board_category, board_title, board_content)
@@ -444,16 +558,22 @@ def select_team_match_posts(
     "/request",
     status_code=status.HTTP_201_CREATED,
     responses={
+        401: {"description": "로그인 정보가 없거나 만료됨"},
         403: {"description": "팀장이 아님"},
         404: {"description": "매칭신청 게시글이 존재하지 않음"},
         409: {"description": "내 팀 게시글 / 다른 종목 / 이미 신청 / 이미 성사·마감된 게시글"},
+        422: {"description": "선택 인원·요청 형식 오류"},
+        500: {"description": "출전 예약 또는 신청 DB 처리 실패"},
     },
 )
 def create_team_match_request(
     c_id_seq: Annotated[str, Body(min_length=4, max_length=50, description="신청하는 회원 (신청 팀 팀장)")],
     bulletin_seq: Annotated[int, Body(gt=0, description="신청할 매칭신청 게시글 번호")],
+    member_ids: Annotated[list[str], Body(description='정확히 구장 정원의 절반인 출전자 목록')],
+    account: dict = Depends(current_account),
 ):
     c_id_seq = c_id_seq.strip()
+    own_actor(account, c_id_seq)
     sport_name = sport_from_customer_id(c_id_seq)
     connection = None
     try:
@@ -472,6 +592,9 @@ def create_team_match_request(
             if post is None:
                 raise HTTPException(status_code=404, detail="존재하지 않는 매칭신청 게시글입니다.")
 
+            if not lineup.unpack(post['board_content']):
+                raise HTTPException(409, '출전 명단이 없는 기존 공고입니다. 새 공고에서 신청해 주세요.')
+
             # 3) 신청 가능한 게시글인지 확인
             post_team = find_captain_team(cursor, post["c_id_seq"])
             if post["c_id_seq"] == c_id_seq or (post_team and post_team["t_id"] == my_team["t_id"]):
@@ -488,7 +611,8 @@ def create_team_match_request(
 
             # 5) 신청 댓글 저장 (depth 0, 신청 팀 팀장 이름)
             comment_seq = insert_comment(cursor, bulletin_seq, c_id_seq, None, 0,
-                                         REQUEST_TEXT.format(team=my_team["t_name"]))
+                                         lineup.pack(REQUEST_TEXT.format(team=my_team["t_name"]),
+                                             lineup.store(cursor, post, my_team['t_id'], member_ids)))
         connection.commit()
         return {
             "result": "OK",
@@ -564,7 +688,7 @@ def select_team_match_requests(
                     member_count = cursor.fetchone()["n"]
                 requests.append({
                     "comment_seq": comment["comment_seq"],          # 신청 댓글 번호 (수락/거절할 때 사용)
-                    "comment_content": comment["comment_content"],  # 신청 댓글 내용
+                    "comment_content": lineup.visible(comment["comment_content"]),
                     "c_id_seq": comment["c_id_seq"],                # 신청한 팀장
                     "c_name": comment["c_name"],                    # 신청한 팀장 이름
                     **team_to_dict(team),                           # 신청 팀 (팀명 · 로고 · 팀 점수)
@@ -608,7 +732,7 @@ def answer_team_match_request(c_id_seq: str, bulletin_seq: int, comment_seq: int
 
             # 2) 신청 댓글 조회 (depth 0)
             cursor.execute(
-                """SELECT comment_seq, c_id_seq FROM board_a_write
+                    """SELECT comment_seq, c_id_seq, comment_content FROM board_a_write
                     WHERE bulletin_seq = %s AND comment_seq = %s AND comment_seq > %s
                         AND depth = 0 AND comment_delete_state = 0""",
                 (bulletin_seq, comment_seq, POST_COMMENT_SEQ),
@@ -631,6 +755,26 @@ def answer_team_match_request(c_id_seq: str, bulletin_seq: int, comment_seq: int
             request_team = find_captain_team(cursor, request["c_id_seq"])
             if post_team is None or request_team is None:
                 raise HTTPException(status_code=409, detail="팀 정보를 확인할 수 없는 신청입니다.")
+            home = lineup.unpack(post['board_content'])
+            away = lineup.unpack(request['comment_content'])
+            if is_accepted:
+                if not home or not away:
+                    raise HTTPException(409, '기존 공고·신청에는 출전 명단이 없습니다. 명단을 등록한 공고로 신청해 주세요.')
+                if home['team_id'] != post_team['t_id'] or away['team_id'] != request_team['t_id']:
+                    raise HTTPException(409, '신청 당시 팀 정보가 변경되었습니다.')
+                lineup.confirm(cursor, post, home, away)
+                # 다른 대기 신청은 거절 처리하고 그 신청이 생성한 예약만 정리합니다.
+                cursor.execute("""SELECT comment_seq,c_id_seq,comment_content FROM board_a_write
+                    WHERE bulletin_seq=%s AND comment_seq>0 AND depth=0 AND comment_delete_state=0
+                    AND comment_seq<>%s""", (bulletin_seq, comment_seq))
+                others = list(cursor.fetchall())
+                for other in others:
+                    if request_status(cursor, bulletin_seq, other['comment_seq']) == STATUS_REQUESTED:
+                        lineup.discard(cursor, post, lineup.unpack(other['comment_content']))
+                        insert_comment(cursor, bulletin_seq, c_id_seq, other['comment_seq'], 1,
+                                       REJECT_TEXT.format(team='다른'))
+            else:
+                lineup.discard(cursor, post, away)
 
             # 5) 대댓글(depth 1) 저장 : 수락 / 거절 (reply_to = 신청 댓글)
             text = ACCEPT_TEXT if is_accepted else REJECT_TEXT
@@ -688,16 +832,20 @@ def answer_team_match_request(c_id_seq: str, bulletin_seq: int, comment_seq: int
 @router.post(
     "/accept",
     responses={
+        401: {"description": "로그인 정보가 없거나 만료됨"},
         403: {"description": "게시글 작성자가 아님"},
         404: {"description": "신청 또는 게시글이 존재하지 않음"},
         409: {"description": "이미 수락·거절한 신청 또는 이미 성사·마감된 게시글"},
+        422: {"description": "요청 형식 오류"}, 500: {"description": "매칭 처리 DB 오류"},
     },
 )
 def accept_team_match_request(
     c_id_seq: Annotated[str, Body(min_length=4, max_length=50, description="게시글 작성자 (게시글 팀 팀장)")],
     bulletin_seq: Annotated[int, Body(gt=0, description="매칭신청 게시글 번호")],
     comment_seq: Annotated[int, Body(gt=0, description="수락할 신청 댓글 번호")],
+    account: dict = Depends(current_account),
 ):
+    own_actor(account, c_id_seq.strip())
     return answer_team_match_request(c_id_seq, bulletin_seq, comment_seq, True)
 
 
@@ -705,16 +853,20 @@ def accept_team_match_request(
 @router.post(
     "/reject",
     responses={
+        401: {"description": "로그인 정보가 없거나 만료됨"},
         403: {"description": "게시글 작성자가 아님"},
         404: {"description": "신청 또는 게시글이 존재하지 않음"},
         409: {"description": "이미 수락·거절한 신청 또는 이미 성사·마감된 게시글"},
+        422: {"description": "요청 형식 오류"}, 500: {"description": "매칭 처리 DB 오류"},
     },
 )
 def reject_team_match_request(
     c_id_seq: Annotated[str, Body(min_length=4, max_length=50, description="게시글 작성자 (게시글 팀 팀장)")],
     bulletin_seq: Annotated[int, Body(gt=0, description="매칭신청 게시글 번호")],
     comment_seq: Annotated[int, Body(gt=0, description="거절할 신청 댓글 번호")],
+    account: dict = Depends(current_account),
 ):
+    own_actor(account, c_id_seq.strip())
     return answer_team_match_request(c_id_seq, bulletin_seq, comment_seq, False)
 
 # 최종 수정 일 : 2026-10-27 / 작업자 : 양태건
@@ -722,3 +874,4 @@ def reject_team_match_request(
 # 수정 일 : 2026-10-28 / 작업자 : 양태건
 # 팀원 수는 승인된 가입자와 기존 빈 상태만 집계합니다.
 # 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+# 최종 수정 일 : 2026-10-30 / 작업자 : 최현준
