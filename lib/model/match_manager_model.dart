@@ -8,6 +8,7 @@ class MatchManager {
   final String m_gender;                    // 성별
   final String m_workplace;                 // 근무지
   final DateTime? m_resianationdate;        // 퇴사일
+  final String m_department;                // 부서
 
   MatchManager(
     {
@@ -17,7 +18,8 @@ class MatchManager {
       required this.m_phone,
       required this.m_gender,
       required this.m_workplace,
-      this.m_resianationdate
+      this.m_resianationdate,
+      required this.m_department,
     }
   );
 
@@ -31,6 +33,7 @@ class MatchManager {
       m_gender: json['m_gender'] ?? "__",
       m_workplace: json['m_workplace'] ?? "__",
       m_resianationdate: DateTime.tryParse(json['m_resianationdate'] ?? ''),
+      m_department: json['m_department'] ?? "__",
     );
   }
 
@@ -43,6 +46,7 @@ class MatchManager {
       'm_gender': m_gender,
       'm_workplace': m_workplace,
       'm_resianationdate': m_resianationdate?.toIso8601String(),
+      'm_department': m_department,
     };
   }
 }

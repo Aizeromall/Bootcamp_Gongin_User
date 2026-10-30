@@ -10,11 +10,12 @@ class Customer {
   final String c_gender;                 // 성별
   final DateTime c_birthday;             // 생년월일
   final String c_team;                   // 소속팀명
-  final int c_rating;                 // 점수
+  final int c_rating;                    // 점수
   final String c_position;               // 선호포지션
   final String c_category;               // 종목
   final DateTime c_signupdate;           // 가입일
   final DateTime? c_deletedate;          // 탈퇴일
+  final String c_login_type;             // 로그인 타입
 
   Customer(
     {
@@ -32,6 +33,7 @@ class Customer {
       required this.c_category,
       required this.c_signupdate,
       this.c_deletedate,
+      required this.c_login_type,
     }
   );
 
@@ -64,7 +66,8 @@ class Customer {
       c_position: json['c_position'] ?? "__",
       c_category: json['c_category'] ?? "__",
       c_signupdate: DateTime.parse(json['c_signupdate']),
-      c_deletedate: DateTime.tryParse(json['c_deletedate'] ?? '')
+      c_deletedate: DateTime.tryParse(json['c_deletedate'] ?? ''),
+      c_login_type: json['c_login_type'] ?? "__",
     );
   }
 
@@ -84,6 +87,7 @@ class Customer {
       'c_category': c_category,
       'c_signupdate': c_signupdate.toIso8601String(),
       'c_deletedate': c_deletedate?.toIso8601String(),
+      'c_login_type': c_login_type,
     };
   }
 }
