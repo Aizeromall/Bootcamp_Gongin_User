@@ -39,7 +39,7 @@ class _BoardDetailPageState extends ConsumerState<BoardDetailPage> {
   // 하단 입력은 최초 댓글을 부모 없이 전송하고 실패 시 내용을 보존합니다.
   Future<void> sendComment() async {
     if (sending || replyText.text.trim().isEmpty) return;
-    final id = ref.read(memberIdProvider);
+    final id = actingId();
     final text = replyText.text.trim();
     setState(() => sending = true);
     try {
@@ -62,6 +62,24 @@ class _BoardDetailPageState extends ConsumerState<BoardDetailPage> {
     }
   }
 
+  // 수정 일 : 2026-10-30 / 작업자 : 김병재
+  // 종목 Dropdown 제거: 요청에 쓸 내 종목 회원 ID를 정합니다.
+  // (1) 수정·삭제 대상이 내 글·댓글이면 그 작성자 ID, (2) 이 게시글 종목의 내 ID, (3) 현재 선택 종목 ID 순입니다.
+  String actingId([Map<String, dynamic>? row]) {
+    final ids = ref.read(memberIdsProvider);
+    final author = row?['c_id_seq'];
+    if (author is String && ids.contains(author)) return author;
+    final name = ref
+        .read(apiDocumentProvider(post))
+        .asData
+        ?.value['event_category'];
+    final sport = sports.entries
+        .where((entry) => entry.value == name)
+        .map((entry) => entry.key)
+        .firstOrNull;
+    return myMemberIdFor(ids, sport) ?? ref.read(memberIdProvider);
+  }
+
   ApiQuery get post => apiQuery('/board/select/${widget.seq}');
   ApiQuery get comments => apiQuery('/board/comment/select/${widget.seq}');
   Future<void> edit(
@@ -69,7 +87,8 @@ class _BoardDetailPageState extends ConsumerState<BoardDetailPage> {
     bool comment = false,
     bool reply = false,
   }) async {
-    final id = ref.read(memberIdProvider);
+    // 답글은 부모 댓글 작성자가 아니라 이 글 종목의 내 ID로 작성합니다.
+    final id = reply ? actingId() : actingId(row);
     await showDialog<bool>(
       context: context,
       builder: (_) => BoardEditor(
@@ -110,7 +129,9 @@ class _BoardDetailPageState extends ConsumerState<BoardDetailPage> {
   Future<void> remove([Map<String, dynamic>? row]) async {
     if (busy) return;
     setState(() => busy = true);
-    final id = ref.read(memberIdProvider);
+    final id = actingId(
+      row ?? ref.read(apiDocumentProvider(post)).asData?.value,
+    );
     try {
       final ok = await showDialog<bool>(
         context: context,
@@ -159,12 +180,13 @@ class _BoardDetailPageState extends ConsumerState<BoardDetailPage> {
   // 작성자·본문·실제 조회/댓글 수·연결 경기·계층 댓글을 목업 스타일로 표시합니다.
   @override
   Widget build(BuildContext context) {
-    final id = ref.watch(memberIdProvider);
+    // 수정 일 : 2026-10-30 / 작업자 : 김병재 — 내 모든 종목 ID 중 하나로 쓴 글·댓글이면 내 것으로 표시합니다.
+    final ids = ref.watch(memberIdsProvider);
     final writable = ref.watch(boardCommentWritableProvider(widget.seq));
     final canComment = writable.asData?.value == true;
     final postValue = ref.watch(apiDocumentProvider(post)).asData?.value;
     final commentValue = ref.watch(apiDocumentProvider(comments)).asData?.value;
-    final own = postValue?['c_id_seq'] == id;
+    final own = ids.contains(postValue?['c_id_seq']);
     final sport = '${postValue?['event_category'] ?? ''}';
     final emoji =
         {
@@ -453,7 +475,8 @@ class _BoardDetailPageState extends ConsumerState<BoardDetailPage> {
                                     style: TextStyle(fontSize: 11),
                                   ),
                                 ),
-                              if (!deleted && row['c_id_seq'] == id) ...[
+                              if (!deleted &&
+                                  ids.contains(row['c_id_seq'])) ...[
                                 TextButton(
                                   onPressed: busy
                                       ? null
@@ -487,3 +510,4 @@ class _BoardDetailPageState extends ConsumerState<BoardDetailPage> {
   }
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-30 / 작업자 : 김병재 (전 종목 회원 ID 기준 글·댓글 작성자 판단)

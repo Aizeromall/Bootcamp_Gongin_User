@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../vm/all_members_state.dart';
 import '../../vm/member_state.dart';
 import '../../vm/member_features.dart';
 import '../shared/ui.dart';
@@ -19,10 +20,12 @@ class _InquiryPageState extends ConsumerState<InquiryPage> {
   bool busy = false;
   String? memberId;
   // 수정 일 : 2026-10-28 / 작업자 : 양태건
-  ApiQuery get query => apiQuery('/inquiry/list', {'c_id_seq': memberId!});
+  // 수정 일 : 2026-10-30 / 작업자 : 김병재
+  // 종목 Dropdown 제거: 모든 종목 회원 ID로 남긴 문의를 합쳐 보여주고, 새로고침 시 종목별 조회를 모두 갱신합니다.
+  ApiQuery get query => apiQuery('/inquiry/list', {'c_id_seq': '{id}'});
   Future<Map<String, dynamic>> get future =>
-      ref.watch(apiDocumentProvider(query).future);
-  void load() => ref.invalidate(apiDocumentProvider(query));
+      ref.watch(allMembersDocumentProvider(query).future);
+  void load() => ref.invalidate(apiDocumentProvider);
 
   @override
   void dispose() {
@@ -67,7 +70,8 @@ class _InquiryPageState extends ConsumerState<InquiryPage> {
   // 디버그: 기존 문의·답변을 유지하고 선택한 부모 ID로 추가 답변을 전송합니다.
   Future<void> replyTo(Map<String, dynamic> row) async {
     if (busy) return;
-    final id = memberId!;
+    // 수정 일 : 2026-10-30 / 작업자 : 김병재 — 원 문의를 남긴 종목 회원 ID로 답글을 작성합니다.
+    final id = '${row['member_id'] ?? memberId}';
     final api = ref.read(memberApiProvider);
     setState(() => busy = true);
     try {
@@ -282,3 +286,4 @@ class _InquiryPageState extends ConsumerState<InquiryPage> {
   }
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-30 / 작업자 : 김병재 (전 종목 문의 통합·원 문의 종목 ID로 답글)

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../vm/member_state.dart';
+import '../../vm/all_members_state.dart';
 import '../../vm/history_state.dart';
 import '../payment/payment_page.dart';
 import '../shared/ui.dart';
@@ -22,11 +23,14 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
   bool cancelBusy = false;
   String? memberId;
   // 수정 일 : 2026-10-28 / 작업자 : 양태건
-  ({String id, bool canceled}) get historyKey =>
-      (id: memberId!, canceled: kind == 'cancel');
+  // 수정 일 : 2026-10-30 / 작업자 : 김병재
+  // 종목 Dropdown 제거: 가입한 모든 종목의 내역을 합쳐 보여주고, 새로고침 시 종목별 조회를 모두 갱신합니다.
   Future<Map<String, dynamic>> get future =>
-      ref.watch(historyProvider(historyKey).future);
-  void load() => ref.invalidate(historyProvider(historyKey));
+      ref.watch(allHistoryProvider(kind == 'cancel').future);
+  void load() {
+    ref.invalidate(historyProvider);
+    ref.invalidate(allHistoryProvider);
+  }
 
   // 디버그: 기존 페이지의 대화상자에서 직접 작성한 사유를 전송합니다.
   // 작업자 : 양태건 / 최종 수정일 : 2026-10-26
@@ -90,7 +94,7 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
       if (!mounted) return;
       showMessage(context, '예약이 취소되었습니다.');
       setState(() {
-        if (memberId == id) kind = 'cancel';
+        kind = 'cancel';
         load();
       });
     } catch (error) {
@@ -102,15 +106,10 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
 
   @override
   Widget build(BuildContext context) {
-    final id = ref.watch(memberIdProvider);
-    if (id != memberId) {
-      memberId = id;
-    }
+    // 수정 일 : 2026-10-30 / 작업자 : 김병재 — 행마다 그 예약의 내 종목 ID(member_id)를 사용합니다.
+    final fallbackId = ref.watch(memberIdProvider);
     return pageContent([
-      heading(
-        '나의 플레이 기록',
-        '${sports[ref.watch(sportProvider)]} 예약·결제와 취소 내역을 확인하세요.',
-      ),
+      heading('나의 플레이 기록', '가입한 모든 종목의 예약·결제와 취소 내역을 확인하세요.'),
       SegmentedButton<String>(
         segments: const [
           ButtonSegment(value: 'reservation', label: Text('예약·결제')),
@@ -133,115 +132,112 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
       ResultList(
         future: future,
         retry: () => setState(load),
-        item: (row) => Card(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 수정 일 : 2026-10-28 / 작업자 : 양태건
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    MemberStatusBadge(
-                      kind == 'cancel'
-                          ? '취소 내역'
-                          : row['is_paid'] == true
-                          ? '결제 기록 완료'
-                          : '결제 대기',
-                      color: kind == 'cancel' ? Colors.red : MemberStyle.blue,
-                    ),
-                    MemberStatusBadge(sports[ref.watch(sportProvider)]!),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  '${row['g_name']}',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                // 수정 일 : 2026-10-28 / 작업자 : 양태건
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(
-                          builder: (_) =>
-                              ReservationDetailPage(seq: row['r_seq'] as int),
-                        ),
-                      );
-                      if (mounted) setState(load);
-                    },
-                    icon: const Icon(Icons.confirmation_number_outlined),
-                    label: const Text('예약 상세'),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${row['r_date']} · ${row['rs_time']} ~ ${row['re_time']}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: MemberStyle.muted,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // 디버그: 취소일 대신 실제 취소 사유를 표시합니다.
-                // 작업자 : 양태건 / 최종 수정일 : 2026-10-26
-                if (kind == 'cancel')
-                  Text(
-                    '취소 사유: ${row['cancel_reason'] ?? {'1': '정원 미달', '2': '우천·기상 악화', '3': '노쇼 및 환불'}['${row['r_c_category']}'] ?? row['r_c_category'] ?? '사유 미등록'}',
-                  )
-                else if (row['is_paid'] == true && row['p_num'] != null)
-                  Text(
-                    '${row['p_amount']}원 · ${row['p_method']}\n결제번호 ${row['p_num']}',
-                  )
-                else ...[
-                  Text(row['is_paid'] == true ? '결제 기록 완료' : '결제 대기'),
-                  if (row['is_paid'] != true)
-                    FilledButton.tonal(
-                      onPressed: cancelBusy
-                          ? null
-                          : () async {
-                              await Navigator.push(
-                                context,
-                                MaterialPageRoute<void>(
-                                  builder: (_) => PaymentPage(
-                                    rSeq: row['r_seq'] as int,
-                                    memberId: id,
-                                    groundName: '${row['g_name']}',
-                                  ),
-                                ),
-                              );
-                              if (mounted) {
-                                setState(load);
-                              }
-                            },
-                      child: const Text('결제 이어하기'),
-                    ),
-                ],
-                if (kind != 'cancel' &&
-                    row['r_check'] != true &&
-                    DateTime.tryParse('${row['r_date']}') != null &&
-                    !DateTime.parse('${row['r_date']}')
-                        .isBefore(DateUtils.dateOnly(DateTime.now())))
-                  TextButton.icon(
-                    onPressed: cancelBusy
-                        ? null
-                        : () => cancelReservation(row, id),
-                    icon: const Icon(Icons.cancel_outlined),
-                    label: const Text('예약 취소'),
-                  ),
-              ],
-            ),
-          ),
-        ),
+        item: (row) => historyCard(row, '${row['member_id'] ?? fallbackId}'),
       ),
     ]);
   }
+
+  // 수정 일 : 2026-10-30 / 작업자 : 김병재
+  // 내역 카드: 종목 배지와 취소·결제 요청은 그 예약의 내 종목 회원 ID(id) 기준입니다.
+  Widget historyCard(Map<String, dynamic> row, String id) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 수정 일 : 2026-10-28 / 작업자 : 양태건
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              MemberStatusBadge(
+                kind == 'cancel'
+                    ? '취소 내역'
+                    : row['is_paid'] == true
+                    ? '결제 기록 완료'
+                    : '결제 대기',
+                color: kind == 'cancel' ? Colors.red : MemberStyle.blue,
+              ),
+              MemberStatusBadge(sports[sportOfMember(id)] ?? ''),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '${row['g_name']}',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+          ),
+          // 수정 일 : 2026-10-28 / 작업자 : 양태건
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) =>
+                        ReservationDetailPage(seq: row['r_seq'] as int),
+                  ),
+                );
+                if (mounted) setState(load);
+              },
+              icon: const Icon(Icons.confirmation_number_outlined),
+              label: const Text('예약 상세'),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${row['r_date']} · ${row['rs_time']} ~ ${row['re_time']}',
+            style: const TextStyle(fontSize: 12, color: MemberStyle.muted),
+          ),
+          const SizedBox(height: 12),
+          // 디버그: 취소일 대신 실제 취소 사유를 표시합니다.
+          // 작업자 : 양태건 / 최종 수정일 : 2026-10-26
+          if (kind == 'cancel')
+            Text(
+              '취소 사유: ${row['cancel_reason'] ?? {'1': '정원 미달', '2': '우천·기상 악화', '3': '노쇼 및 환불'}['${row['r_c_category']}'] ?? row['r_c_category'] ?? '사유 미등록'}',
+            )
+          else if (row['is_paid'] == true && row['p_num'] != null)
+            Text(
+              '${row['p_amount']}원 · ${row['p_method']}\n결제번호 ${row['p_num']}',
+            )
+          else ...[
+            Text(row['is_paid'] == true ? '결제 기록 완료' : '결제 대기'),
+            if (row['is_paid'] != true)
+              FilledButton.tonal(
+                onPressed: cancelBusy
+                    ? null
+                    : () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute<void>(
+                            builder: (_) => PaymentPage(
+                              rSeq: row['r_seq'] as int,
+                              memberId: id,
+                              groundName: '${row['g_name']}',
+                            ),
+                          ),
+                        );
+                        if (mounted) {
+                          setState(load);
+                        }
+                      },
+                child: const Text('결제 이어하기'),
+              ),
+          ],
+          if (kind != 'cancel' &&
+              row['r_check'] != true &&
+              DateTime.tryParse('${row['r_date']}') != null &&
+              !DateTime.parse('${row['r_date']}')
+                  .isBefore(DateUtils.dateOnly(DateTime.now())))
+            TextButton.icon(
+              onPressed: cancelBusy ? null : () => cancelReservation(row, id),
+              icon: const Icon(Icons.cancel_outlined),
+              label: const Text('예약 취소'),
+            ),
+        ],
+      ),
+    ),
+  );
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-30 / 작업자 : 김병재 (종목 Dropdown 제거: 전 종목 예약·결제·취소 내역 통합)

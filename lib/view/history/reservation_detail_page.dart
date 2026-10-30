@@ -16,7 +16,9 @@ class ReservationDetailPage extends ConsumerWidget {
   final int seq;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final id = ref.watch(memberIdProvider);
+    // 수정 일 : 2026-10-30 / 작업자 : 김병재
+    // 종목 Dropdown 제거: 내 모든 종목 회원 ID 중 하나의 예약이면 상세를 보여줍니다.
+    final ids = ref.watch(memberIdsProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('예약 상세')),
       body: ListView(
@@ -25,7 +27,9 @@ class ReservationDetailPage extends ConsumerWidget {
           ApiContent(
             query: apiQuery('/match/reservation/$seq'),
             builder: (row) {
-              if (row['c_id_seq'] != id) return const Text('현재 회원의 예약이 아닙니다.');
+              if (!ids.contains(row['c_id_seq'])) {
+                return const Text('현재 회원의 예약이 아닙니다.');
+              }
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -120,7 +124,8 @@ class ReservationDetailPage extends ConsumerWidget {
                           MaterialPageRoute<void>(
                             builder: (_) => PaymentPage(
                               rSeq: seq,
-                              memberId: id,
+                              // 결제는 이 예약의 종목 회원 ID로 진행합니다.
+                              memberId: '${row['c_id_seq']}',
                               groundName: '${row['g_name']}',
                             ),
                           ),
@@ -146,3 +151,4 @@ class ReservationDetailPage extends ConsumerWidget {
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
 // 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (예약 분류 문자열 비교)
+// 최종 수정 일 : 2026-10-30 / 작업자 : 김병재 (전 종목 예약 상세·결제 회원 ID)

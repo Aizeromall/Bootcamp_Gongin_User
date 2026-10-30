@@ -17,19 +17,20 @@ class ResultPage extends ConsumerWidget {
   final int? seq;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final id = ref.watch(memberIdProvider);
+    // 수정 일 : 2026-10-30 / 작업자 : 김병재
+    // 종목 Dropdown 제거: 목록은 모든 종목 회원 ID의 경기 결과를 합치고, 상세는 내 종목 ID 중 하나면 표시합니다.
+    final ids = ref.watch(memberIdsProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('경기 결과')),
       body: pageContent([
         ApiContent(
+          allMembers: seq == null,
           query: apiQuery(
-            seq == null
-                ? '/match/result/customer/${Uri.encodeComponent(id)}'
-                : '/match/result/$seq',
+            seq == null ? '/match/result/customer/{id}' : '/match/result/$seq',
           ),
           builder: (data) {
             if (seq != null) {
-              if (data['c_id_seq'] != id) {
+              if (!ids.contains(data['c_id_seq'])) {
                 return const Text('현재 회원의 경기 기록이 아닙니다.');
               }
               return Column(
@@ -136,3 +137,4 @@ class ResultPage extends ConsumerWidget {
   }
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-30 / 작업자 : 김병재 (전 종목 경기 결과 통합)
