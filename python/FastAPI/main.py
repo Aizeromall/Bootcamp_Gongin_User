@@ -15,14 +15,15 @@ from fastapi.middleware.cors import CORSMiddleware
 # python 폴더를 import 경로에 넣은 뒤 절대 import를 사용합니다.
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from FastAPI.auth import auth_router
-    from FastAPI.chat import chat_router
-    from FastAPI.notification import notification_router
-    from FastAPI.team_create.team import router as team_router
-    from FastAPI.announce import announce_router
-    from FastAPI.board.board import router as board_router
-    from FastAPI.inquiry.inquiry import router as inquiry_router
-    from FastAPI.match import match_router
+    from FastAPI.auth import auth_router  # 라우터 집계 파일 최초 작업자 : 최현준
+    from FastAPI.chat import chat_router  # 라우터 집계 파일 최초 작업자 : 양태건
+    from FastAPI.notification import notification_router  # 라우터 집계 파일 최초 작업자 : 최현준
+    from FastAPI.team_create.team import router as team_router  # 라우터 파일 최초 작업자 : 양태건
+    from FastAPI.announce import announce_router  # 공지 라우터 파일 최초 작업자 : 최현준
+    from FastAPI.banner import banner_router  # 배너 라우터 파일 최초 작업자 : 최현준
+    from FastAPI.board.board import router as board_router  # 라우터 파일 최초 작업자 : 양태건
+    from FastAPI.inquiry.inquiry import router as inquiry_router  # 라우터 파일 최초 작업자 : 김병재
+    from FastAPI.match import match_router  # 라우터 집계 파일 최초 작업자 : 최현준
     from FastAPI.cancel import cancel_router                # 수정 : 신현진 2026.10.23
     from FastAPI.report.report import router as report_router   # 수정 : 김병재 2026.10.26
     from FastAPI.sanction.sanction import router as sanction_router   # 수정 : 김병재 2026.10.27
@@ -45,14 +46,15 @@ if __package__ in (None, ""):
     from FastAPI.my_team.my_team import router as my_team_router
 else:
     # `python -m FastAPI.main` 모듈 실행에서는 일반 상대 import를 사용합니다.
-    from .auth import auth_router
-    from .chat import chat_router
-    from .notification import notification_router
-    from .team_create.team import router as team_router
-    from .announce import announce_router
-    from .board.board import router as board_router
-    from .inquiry.inquiry import router as inquiry_router
-    from .match import match_router
+    from .auth import auth_router  # 라우터 집계 파일 최초 작업자 : 최현준
+    from .chat import chat_router  # 라우터 집계 파일 최초 작업자 : 양태건
+    from .notification import notification_router  # 라우터 집계 파일 최초 작업자 : 최현준
+    from .team_create.team import router as team_router  # 라우터 파일 최초 작업자 : 양태건
+    from .announce import announce_router  # 공지 라우터 파일 최초 작업자 : 최현준
+    from .banner import banner_router  # 배너 라우터 파일 최초 작업자 : 최현준
+    from .board.board import router as board_router  # 라우터 파일 최초 작업자 : 양태건
+    from .inquiry.inquiry import router as inquiry_router  # 라우터 파일 최초 작업자 : 김병재
+    from .match import match_router  # 라우터 집계 파일 최초 작업자 : 최현준
     from .cancel import cancel_router                       # 수정 : 신현진 2026.10.23
     from .report.report import router as report_router      # 수정 : 김병재 2026.10.26
     from .sanction.sanction import router as sanction_router      # 수정 : 김병재 2026.10.27
@@ -111,16 +113,24 @@ def health() -> dict[str, str]:
 
 
 # 인증 router: 회원가입·로그인 기능을 /auth 하위 경로로 연결합니다.
+# 라우터 집계 파일 최초 작업자 : 최현준 (auth/__init__.py)
 app.include_router(auth_router, prefix="/auth")
 # 공지 router: 사용자 대상 공지의 분류·목록·상세만 읽기 전용으로 제공합니다.
+# 라우터 파일 최초 작업자 : 최현준 (announce/announce.py)
 app.include_router(announce_router, prefix="/announce", tags=["User Announcement"])
+# 회원 배너 router: 게시 기간 중 활성화된 이미지 조회만 제공합니다.
+# 라우터 파일 최초 작업자 : 최현준 (banner/banner.py)
+app.include_router(banner_router, prefix="/banner", tags=["User Banner"])
 # 구장 예약 router: 종목별 회원 ID와 구장 코드를 reservation 테이블에 연결합니다.
+# 라우터 집계 파일 최초 작업자 : 최현준 (match/__init__.py)
 app.include_router(match_router, prefix="/match", tags=["Ground Reservation"])
 
 # 문의 router: 문의 작성·내 문의 목록 기능을 /inquiry 하위 경로로 연결합니다.
+# 라우터 파일 최초 작업자 : 김병재 (inquiry/inquiry.py)
 app.include_router(inquiry_router, prefix="/inquiry")
 
 # 취소 router: 회원 예약 취소 기능을 /cancel 하위 경로로 연결합니다.          # 수정 : 신현진 2026.10.23
+# 라우터 집계 파일 최초 작업자 : 신현진 (cancel/__init__.py)
 app.include_router(cancel_router, prefix="/cancel")
 
 # 중간 수정 작성자 - 신현진
@@ -130,6 +140,7 @@ app.include_router(cancel_router, prefix="/cancel")
 #   - 구장 대여 : /ground/reservation/...    (회원·팀장이 비어 있는 시간대에 구장 전체를 빌림, 담당 매니저 지정)
 # 실력매칭 예약(/match/reservation)과 같은 시간대에 겹치지 않도록 서로 막습니다.
 # /ground 주소는 ground/__init__.py에서 붙이므로 여기서는 prefix 없이 등록합니다.
+# 라우터 집계 파일 최초 작업자 : 신현진 (ground/__init__.py)
 app.include_router(ground_router)
 
 # 중간 수정 작성자 - 신현진
@@ -139,6 +150,7 @@ app.include_router(ground_router)
 #   - 다른 팀 팀장이 리스트에서 신청 → 게시글에 신청 댓글 ("요청됨")
 #   - 게시글 팀 팀장이 수락 → 대댓글로 수락·성사 기록 + team_match 저장 + 대여 r_check = 1
 # /team_match 주소는 team_match/__init__.py에서 붙이므로 여기서는 prefix 없이 등록합니다.
+# 라우터 집계 파일 최초 작업자 : 신현진 (team_match/__init__.py)
 app.include_router(team_match_router)
 
 # 중간 수정 작성자 - 신현진
@@ -150,11 +162,13 @@ app.include_router(team_match_router)
 #   - 등급 구간표   : /rating/tiers  (관리자 앱과 같은 기준)
 # 점수는 관리자 앱의 경기 결과 등록에서만 바뀝니다.
 # /rating 주소는 rating/__init__.py에서 붙이므로 여기서는 prefix 없이 등록합니다.
+# 라우터 집계 파일 최초 작업자 : 신현진 (rating/__init__.py)
 app.include_router(rating_router)
 
 
 # 수정 일 : 2026-10-26 / 작업자 : 양태건
 # 게시글·댓글 router를 연결하여 Swagger와 앱에서 /board 경로로 사용합니다.
+# 라우터 파일 최초 작업자 : 양태건 (board/board.py)
 app.include_router(board_router, prefix="/board", tags=["Board"])
 
 # ************************
@@ -166,29 +180,37 @@ app.include_router(board_router, prefix="/board", tags=["Board"])
 # 5. 결과 및 추후 보완 사항 : source router는 유지하고 진입점 누락만 복구, 실제 신고 저장은 미검증
 # ************************
 # 신고 router: 회원 신고 작성과 내 신고 내역 조회를 /report 하위에 연결합니다.
+# 라우터 파일 최초 작업자 : 김병재 (report/report.py)
 app.include_router(report_router, prefix="/report")
 
 # 수정 일 : 2026-10-27 / 작업자 : 양태건
 # 팀 개설·최초 팀장 등록 API를 /team 하위에 연결합니다.
+# 라우터 파일 최초 작업자 : 양태건 (team_create/team.py)
 app.include_router(team_router, prefix="/team", tags=["Team"])
 # 제재 router: 내 제재 내역 조회 기능을 /sanction 하위 경로로 연결합니다.   # 수정 : 김병재 2026.10.27
+# 라우터 파일 최초 작업자 : 김병재 (sanction/sanction.py)
 app.include_router(sanction_router, prefix="/sanction")
 
 # 이의신청 router: 이의신청 접수·내 이의신청 내역 기능을 /appeal 하위 경로로 연결합니다.   # 수정 : 김병재 2026.10.27
+# 라우터 파일 최초 작업자 : 김병재 (appeal/appeal.py)
 app.include_router(appeal_router, prefix="/appeal")
 
 # 수정 일 : 2026-10-27 / 작업자 : 양태건
 # 채팅 인증·방 관리와 WebSocket 실시간 메시지를 연결합니다.
+# 라우터 집계 파일 최초 작업자 : 양태건 (chat/__init__.py)
 app.include_router(chat_router)
 # 알림 기기 router: 일반 로그인 JWT로 본인 FCM 토큰만 등록·해제합니다.
+# 라우터 집계 파일 최초 작업자 : 최현준 (notification/__init__.py)
 app.include_router(notification_router)
 
 # 수정 일 : 2026-10-30 / 작업자 : 김병재
 # 토큰 갱신 router: 만료 후 7일 이내의 로그인 JWT를 POST /auth/refresh로 다시 발급합니다.
 # 기존 auth/__init__.py를 수정하지 않도록 main.py에서 /auth prefix로 직접 연결합니다.
+# 라우터 파일 최초 작업자 : 김병재 (auth/refresh_token.py)
 app.include_router(refresh_token_router, prefix="/auth", tags=["Auth Refresh"])
 # 내 소속팀 router: 로그인 JWT의 모든 종목별 소속팀을 GET /my_team으로 조회합니다.
 # /my_team 주소는 my_team/my_team.py에서 붙이므로 여기서는 prefix 없이 등록합니다.
+# 라우터 파일 최초 작업자 : 김병재 (my_team/my_team.py)
 app.include_router(my_team_router)
 
 
@@ -214,3 +236,5 @@ if __name__ == "__main__":
 # 최종 수정 일 : 2026-10-27 / 작업자 : 최현준 (알림 기기 router 연결)
 # 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (신고 router 진입점 복구)
 # 최종 수정 일 : 2026-10-30 / 작업자 : 김병재 (토큰 갱신·내 소속팀 router 등록)
+# 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (회원 배너 조회 router 등록)
+# 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (라우터 파일별 최초 작업자 명시)

@@ -33,7 +33,7 @@ class MemberBrand extends StatelessWidget {
           style: TextStyle(
             fontSize: large ? 27 : 23,
             fontWeight: FontWeight.w900,
-            color: MemberStyle.ink,
+            color: Theme.of(context).colorScheme.onSurface,
             letterSpacing: -0.7,
           ),
           children: const [
@@ -65,10 +65,14 @@ class MemberPanel extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 16),
     child: Material(
-      color: color,
+      color:
+          Theme.of(context).brightness == Brightness.dark &&
+              (color == Colors.white || color == MemberStyle.surface)
+          ? Theme.of(context).colorScheme.surfaceContainerHigh
+          : color,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        side: const BorderSide(color: MemberStyle.line),
+        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       clipBehavior: Clip.antiAlias,
       child: Padding(
@@ -84,8 +88,10 @@ class MemberInfoRow extends StatelessWidget {
   final String label;
   final Object? value;
   @override
+  // 수정 일 : 2026-10-30 / 작업자 : 최현준
+  // 정보 이름과 값을 크기와 대비로 구분합니다.
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 7),
+    padding: const EdgeInsets.symmetric(vertical: 8),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -93,13 +99,21 @@ class MemberInfoRow extends StatelessWidget {
           width: 88,
           child: Text(
             label,
-            style: const TextStyle(fontSize: 12, color: MemberStyle.muted),
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.45,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
         Expanded(
           child: Text(
             '${value ?? '미등록'}',
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            style: const TextStyle(
+              fontSize: 14,
+              height: 1.45,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ],
@@ -107,6 +121,7 @@ class MemberInfoRow extends StatelessWidget {
   );
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (공통 패널 테마 대응)
 
 // 수정 일 : 2026-10-28 / 작업자 : 양태건
 // 실제 서버 상태를 짧은 라벨로 표현하며 색상만으로 상태를 구분하지 않습니다.
@@ -127,7 +142,7 @@ class MemberStatusBadge extends StatelessWidget {
     ),
     child: Text(
       label,
-      style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700),
+      style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700),
     ),
   );
 }
@@ -140,7 +155,7 @@ class MemberMetricTile extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(13),
     decoration: BoxDecoration(
-      color: MemberStyle.surface,
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
       borderRadius: BorderRadius.circular(10),
     ),
     child: Column(
@@ -148,12 +163,15 @@ class MemberMetricTile extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 11, color: MemberStyle.muted),
+          style: TextStyle(
+            fontSize: 12,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 5),
         Text(
           '${value ?? '미등록'}',
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
         ),
       ],
     ),
@@ -168,12 +186,14 @@ class MemberSectionTitle extends StatelessWidget {
     padding: const EdgeInsets.only(top: 12, bottom: 12),
     child: Text(
       title,
-      style: const TextStyle(
-        fontSize: 16,
+      style: TextStyle(
+        fontSize: 17,
         fontWeight: FontWeight.w800,
-        color: MemberStyle.ink,
+        color: Theme.of(context).colorScheme.onSurface,
       ),
     ),
   );
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (공통 구성요소 테마 대응)
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준

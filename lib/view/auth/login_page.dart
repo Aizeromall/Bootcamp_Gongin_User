@@ -13,7 +13,6 @@ import '../../service/social_login_exception.dart';
 import '../../service/social_login_service.dart';
 import '../shared/ui.dart';
 import '../shared/member_components.dart';
-import '../shared/member_style.dart';
 import 'register_page.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
@@ -176,9 +175,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     child: MemberBrand(),
                   ),
                   const SizedBox(height: 12),
-                  const Text(
+                  // 수정 일 : 2026-10-30 / 작업자 : 최현준
+                  Text(
                     '다시 만나 반가워요. 오늘은 어떤 경기를 뛸까요?',
-                    style: TextStyle(fontSize: 12, color: MemberStyle.muted),
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.5,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                   const SizedBox(height: 28),
                   TextFormField(
@@ -267,3 +271,4 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
 // 최종 수정 일 : 2026-10-28 / 작업자 : 최현준
 // 최종 수정 일 : 2026-10-29 / 작업자 : 최현준
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준

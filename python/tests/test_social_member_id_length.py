@@ -24,7 +24,7 @@ def database():
 
 
 def requests(member):
-    reservation_body = {"c_id_seq": member, "g_code": "2", "r_date": "2100-01-01", "rs_time": "10:00"}
+    reservation_body = {"c_id_seq": member, "g_code": "2", "r_date": "2100-01-01", "rs_time": "10:00", "p_method": "카카오페이"}
     return [("/match/reservation", reservation, reservation_body),
             ("/ground/reservation", ground_reservation, reservation_body),
             ("/match/payment", payment, {"c_id_seq": member, "r_seq": 7, "p_method": "카카오페이"})]
@@ -37,7 +37,7 @@ def test_48_and_50_character_members_complete_mock_business_flow():
             for path, module, body in requests(member):
                 connection, cursor = database()
                 if module is reservation:
-                    cursor.fetchone.side_effect = [{"g_code": 2, "g_num": 10}, {"exists": 1}, None,
+                    cursor.fetchone.side_effect = [{"g_code": 2, "g_num": 10, "g_price": 10000}, {"exists": 1}, None,
                                                    None, None, {"reservation_count": 0}]
                 elif module is ground_reservation:
                     cursor.fetchone.side_effect = [{"g_code": 2, "g_price": 10000}, {"exists": 1}, None]

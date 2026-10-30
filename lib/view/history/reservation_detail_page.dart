@@ -1,21 +1,111 @@
 // 2026-10-28
 // 작업자 : 양태건
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../vm/member_features.dart';
 import '../../vm/member_state.dart';
+import '../../vm/history_state.dart';
+import '../../vm/all_members_state.dart';
 import '../shared/api_content.dart';
 import '../shared/member_components.dart';
 import '../shared/member_style.dart';
 import '../payment/payment_page.dart';
+import '../shared/ui.dart';
+import 'cancellation_time.dart';
 
 // 수정 일 : 2026-10-28 / 작업자 : 양태건
-class ReservationDetailPage extends ConsumerWidget {
-  const ReservationDetailPage({super.key, required this.seq});
+class ReservationDetailPage extends ConsumerStatefulWidget {
+  const ReservationDetailPage({
+    super.key,
+    required this.seq,
+    this.rental = false,
+  });
   final int seq;
+  final bool rental;
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ReservationDetailPage> createState() =>
+      _ReservationDetailPageState();
+}
+
+class _ReservationDetailPageState extends ConsumerState<ReservationDetailPage> {
+  bool cancelBusy = false;
+  Timer? cutoffTimer;
+  @override
+  void initState() {
+    super.initState();
+    cutoffTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    cutoffTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> cancel(Map<String, dynamic> row) async {
+    if (cancelBusy) return;
+    var input = '';
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: const Text('예약 취소'),
+        content: TextField(
+          onChanged: (value) => input = value,
+          maxLength: 50,
+          decoration: const InputDecoration(labelText: '취소 사유를 입력해 주세요'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog),
+            child: const Text('돌아가기'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (input.trim().isNotEmpty) Navigator.pop(dialog, input.trim());
+            },
+            child: const Text('취소 확정'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || reason == null) return;
+    setState(() => cancelBusy = true);
+    try {
+      final path = '${row['reservation_category']}' == '2'
+          ? '/ground/reservation'
+          : '/cancel/reservation';
+      await ref
+          .read(memberApiProvider)
+          .request(
+            '$path/${widget.seq}',
+            method: 'DELETE',
+            query: {'c_id_seq': '${row['c_id_seq']}', 'r_c_category': reason},
+          );
+      ref.invalidate(historyProvider);
+      ref.invalidate(allHistoryProvider);
+      ref.invalidate(
+        apiDocumentProvider(
+          apiQuery(
+            '${widget.rental ? '/ground' : '/match'}/reservation/${widget.seq}',
+          ),
+        ),
+      );
+      if (mounted) showMessage(context, '예약이 취소되었습니다.');
+    } catch (error) {
+      if (mounted) showMessage(context, error);
+    } finally {
+      if (mounted) setState(() => cancelBusy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final seq = widget.seq;
     // 수정 일 : 2026-10-30 / 작업자 : 김병재
     // 종목 Dropdown 제거: 내 모든 종목 회원 ID 중 하나의 예약이면 상세를 보여줍니다.
     final ids = ref.watch(memberIdsProvider);
@@ -25,7 +115,9 @@ class ReservationDetailPage extends ConsumerWidget {
         padding: const EdgeInsets.all(20),
         children: [
           ApiContent(
-            query: apiQuery('/match/reservation/$seq'),
+            query: apiQuery(
+              '${widget.rental ? '/ground' : '/match'}/reservation/$seq',
+            ),
             builder: (row) {
               if (!ids.contains(row['c_id_seq'])) {
                 return const Text('현재 회원의 예약이 아닙니다.');
@@ -133,12 +225,25 @@ class ReservationDetailPage extends ConsumerWidget {
                         if (context.mounted) {
                           ref.invalidate(
                             apiDocumentProvider(
-                              apiQuery('/match/reservation/$seq'),
+                              apiQuery(
+                                '${widget.rental ? '/ground' : '/match'}/reservation/$seq',
+                              ),
                             ),
                           );
                         }
                       },
                       child: const Text('결제 이어하기'),
+                    ),
+                  OutlinedButton(
+                    onPressed: cancelBusy || !canCancelReservation(row)
+                        ? null
+                        : () => cancel(row),
+                    child: Text(cancelBusy ? '취소 처리 중…' : '예약 취소'),
+                  ),
+                  if (row['is_canceled'] != true && !canCancelReservation(row))
+                    const Text(
+                      '경기 시간 확인이 필요하거나 취소 가능 시간이 지났습니다.',
+                      style: TextStyle(fontSize: 12, color: MemberStyle.muted),
                     ),
                 ],
               );
@@ -149,6 +254,7 @@ class ReservationDetailPage extends ConsumerWidget {
     );
   }
 }
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
 // 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (예약 분류 문자열 비교)
 // 최종 수정 일 : 2026-10-30 / 작업자 : 김병재 (전 종목 예약 상세·결제 회원 ID)

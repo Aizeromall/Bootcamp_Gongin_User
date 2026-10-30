@@ -34,6 +34,7 @@ from .reservation_status import (
     reservation_type_condition,
 )
 from .reservation import ASSIGN_DAY_CONDITION, TIME_SLOTS  # 예약 시간대 목록 (08:00~22:00, 2시간 단위)
+from ..rating.rating_search import rating_tier
 
 # 이 파일의 API들을 담는 라우터 (__init__.py에서 match_router로 묶임)
 router = APIRouter()
@@ -236,6 +237,55 @@ def select_reservation_status(g_code: str, r_date: date):
             connection.close()
 
 
+# 수정 일 : 2026-10-30 / 작업자 : 최현준
+# 취소되지 않은 실력매칭 신청자의 종목별 현재 점수만 집계합니다.
+# 개인 식별자는 반환하지 않으며 중복 예약 행도 회원별 한 번만 계산합니다.
+@router.get("/reservation/ground/{g_code}/ratings", summary="구장·종목별 시간대 신청자 평균 티어",
+            responses={404: {"description": "구장을 찾을 수 없음"},
+                       422: {"description": "날짜 또는 종목 코드 오류"},
+                       500: {"description": "평균 점수 조회 오류"}})
+def select_ground_slot_ratings(g_code: str, r_date: date, sport: int = Query(..., ge=1, le=4)):
+    connection = None
+    try:
+        connection = connect()
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT g_code FROM ground WHERE g_code = %s", (g_code,))
+            if cursor.fetchone() is None:
+                raise HTTPException(status_code=404, detail="존재하지 않는 구장 코드입니다.")
+            cursor.execute(f"""
+                SELECT active.rs_time, COUNT(*) AS applicant_count,
+                       COUNT(c.c_rating) AS rated_count, AVG(c.c_rating) AS average_rating
+                FROM (SELECT DISTINCT r.rs_time, r.c_id_seq FROM reservation AS r
+                      WHERE r.g_code = %s AND r.r_date = %s
+                        AND {category_condition(False, 'r')}
+                        AND {reservation_type_condition(RESERVATION_MATCH, 'r')}
+                        AND RIGHT(r.c_id_seq, 3) = %s) AS active
+                LEFT JOIN customer AS c ON c.c_id_seq = active.c_id_seq
+                GROUP BY active.rs_time
+            """, (g_code, r_date, f"_{sport:02d}"))
+            rows = cursor.fetchall()
+        by_time = {format_time(row["rs_time"]): row for row in rows}
+        slots = []
+        for start, end in TIME_SLOTS.items():
+            row = by_time.get(start, {})
+            average = row.get("average_rating")
+            count = int(row.get("applicant_count") or 0)
+            rated_count = int(row.get("rated_count") or 0)
+            # 누락된 점수가 있으면 일부 인원만의 평균을 전체 평균으로 표시하지 않습니다.
+            average = float(average) if average is not None and rated_count == count else None
+            slots.append({"rs_time": start, "re_time": end, "applicant_count": count,
+                          "average_rating": average, "average_tier": rating_tier(average)})
+        return {"g_code": g_code, "r_date": r_date, "sport": sport, "slots": slots}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("구장 시간대 신청자 평균 점수 조회 실패")
+        raise HTTPException(status_code=500, detail="신청자 평균 티어 조회에 실패했습니다.")
+    finally:
+        if connection is not None:
+            connection.close()
+
+
 # 예약 1건 상세 조회
 # 주의: "/reservation/customer/..", "/reservation/ground/.." 보다 아래에 있어야
 #       "customer", "ground"가 r_seq로 잘못 인식되지 않음
@@ -264,3 +314,4 @@ def select_reservation(r_seq: int):
             connection.close()
 
 # 최종 수정 일 : 2026-10-26 / 작업자 : 양태건 / 수정자 : 신현진 (구장 대여 시간대 마감 표시)
+# 최종 수정 일 : 2026-10-30 / 작업자 : 최현준

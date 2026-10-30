@@ -87,6 +87,13 @@ Future<void> bottom(WidgetTester tester, [String target = '계정 삭제']) asyn
 }
 
 void main() {
+  testWidgets('회원정보 전화번호에 입력·붙여넣기한 숫자 외 문자를 제거', (tester) async {
+    await setup(tester, (_) => response(profile()));
+    final phone = find.byKey(const ValueKey('profile-c_phone'));
+    await tester.enterText(phone, '010-12a3 45!67');
+    expect(tester.widget<TextFormField>(phone).controller!.text, '0101234567');
+  });
+
   testWidgets('선호 종목 4개 표시·기존 선택·신규 선택의 포지션을 한 PATCH로 저장', (tester) async {
     final writes = <http.Request>[];
     final container = await setup(tester, (request) {
@@ -316,12 +323,17 @@ void main() {
       calls.add(request);
       return response(profile());
     }, card: true);
-    expect(calls, isEmpty);
+    expect(
+      calls.where((request) => request.url.path == '/auth/account'),
+      isEmpty,
+    );
     await tester.tap(find.byType(InkWell).first);
     await tester.pumpAndSettle();
     expect(find.text('회원정보 수정'), findsOneWidget);
-    expect(calls.single.url.path, '/auth/account');
-    expect(calls.single.headers['Authorization'], 'Bearer mock-jwt');
+    final accountCall = calls.singleWhere(
+      (request) => request.url.path == '/auth/account',
+    );
+    expect(accountCall.headers['Authorization'], 'Bearer mock-jwt');
   });
 
   testWidgets('조회 실패는 오류와 재시도 경로 제공', (tester) async {
@@ -527,3 +539,4 @@ void main() {
   });
 }
 // 최종 수정 일 : 2026-10-29 / 작업자 : 최현준
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준

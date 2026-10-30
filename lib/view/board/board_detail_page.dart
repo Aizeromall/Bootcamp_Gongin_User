@@ -195,7 +195,7 @@ class _BoardDetailPageState extends ConsumerState<BoardDetailPage> {
         }[sport] ??
         '';
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
           '$emoji $sport 게시판',
@@ -230,9 +230,9 @@ class _BoardDetailPageState extends ConsumerState<BoardDetailPage> {
             12,
             10 + MediaQuery.viewInsetsOf(context).bottom,
           ),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: MemberStyle.line)),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            border: const Border(top: BorderSide(color: MemberStyle.line)),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -254,7 +254,9 @@ class _BoardDetailPageState extends ConsumerState<BoardDetailPage> {
                         ? '작성 가능 여부를 다시 확인해 주세요.'
                         : '매칭 성사로 댓글 작성이 종료되었습니다.',
                     filled: true,
-                    fillColor: MemberStyle.surface,
+                    fillColor: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHighest,
                     counterText: '',
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(
@@ -325,10 +327,10 @@ class _BoardDetailPageState extends ConsumerState<BoardDetailPage> {
                       const SizedBox(height: 10),
                       Text(
                         '${row['board_title']}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 21,
                           fontWeight: FontWeight.w800,
-                          color: MemberStyle.ink,
+                          color: Theme.of(context).colorScheme.onSurface,
                           height: 1.5,
                         ),
                       ),
@@ -338,10 +340,10 @@ class _BoardDetailPageState extends ConsumerState<BoardDetailPage> {
                           RegExp(r'^\[예약번호:\d+\]\s*'),
                           '',
                         ),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           height: 1.85,
-                          color: MemberStyle.ink,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                       const SizedBox(height: 20),
@@ -378,7 +380,10 @@ class _BoardDetailPageState extends ConsumerState<BoardDetailPage> {
                   seq: widget.seq,
                   sport: '${postValue?['event_category']}',
                 ),
-              Container(height: 8, color: MemberStyle.surface),
+              Container(
+                height: 8,
+                color: Theme.of(context).colorScheme.surfaceContainerHigh,
+              ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
                 child: Row(
@@ -421,8 +426,8 @@ class _BoardDetailPageState extends ConsumerState<BoardDetailPage> {
                       ),
                       decoration: BoxDecoration(
                         color: depth > 0
-                            ? const Color(0xFFFAFBFD)
-                            : Colors.white,
+                            ? Theme.of(context).colorScheme.surfaceContainerHigh
+                            : Theme.of(context).colorScheme.surface,
                         border: const Border(
                           bottom: BorderSide(color: MemberStyle.line),
                         ),
@@ -442,7 +447,9 @@ class _BoardDetailPageState extends ConsumerState<BoardDetailPage> {
                                     fontWeight: FontWeight.w800,
                                     color: author
                                         ? const Color(0xFF08AAB8)
-                                        : MemberStyle.ink,
+                                        : Theme.of(context)
+                                              .colorScheme
+                                              .onSurface,
                                   ),
                                 ),
                               ),
@@ -453,10 +460,10 @@ class _BoardDetailPageState extends ConsumerState<BoardDetailPage> {
                             deleted
                                 ? '삭제된 댓글입니다.'
                                 : '${row['comment_content']}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 14,
                               height: 1.6,
-                              color: MemberStyle.ink,
+                              color: Theme.of(context).colorScheme.onSurface,
                             ),
                           ),
                           Wrap(
@@ -511,3 +518,4 @@ class _BoardDetailPageState extends ConsumerState<BoardDetailPage> {
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
 // 최종 수정 일 : 2026-10-30 / 작업자 : 김병재 (전 종목 회원 ID 기준 글·댓글 작성자 판단)
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (게시글 테마 대응)

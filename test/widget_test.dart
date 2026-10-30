@@ -11,6 +11,7 @@ import 'package:bootcamp_project_gongin_admin_app/app.dart';
 import 'package:bootcamp_project_gongin_admin_app/service/member_api.dart';
 import 'package:bootcamp_project_gongin_admin_app/vm/member_state.dart';
 import 'package:bootcamp_project_gongin_admin_app/view/payment/payment_page.dart';
+import 'package:bootcamp_project_gongin_admin_app/view/account/account_page.dart';
 
 import 'package:bootcamp_project_gongin_admin_app/view/auth/register_page.dart';
 import 'package:bootcamp_project_gongin_admin_app/view/history/history_page.dart';
@@ -89,13 +90,22 @@ void main() {
     await tester.enterText(find.byType(TextFormField).at(1), 'password123');
     await tester.tap(find.text('로그인'));
     await tester.pumpAndSettle();
-    expect(find.text('오늘은 어디서 뛸까요?'), findsOneWidget);
+    expect(find.text('진행 중인 배너가 없습니다.'), findsOneWidget);
     expect(find.text('야구'), findsOneWidget);
     // 수정 일 : 2026-10-27 / 작업자 : 양태건
     // 문의는 MY 탭에서 확인합니다.
     await tester.tap(find.text('MY'));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('1:1 문의'), 180);
+    await tester.scrollUntilVisible(
+      find.text('1:1 문의'),
+      180,
+      scrollable: find
+          .descendant(
+            of: find.byType(AccountPage),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
     await tester.tap(find.text('1:1 문의'));
     await tester.pumpAndSettle();
     expect(find.text('무엇을 도와드릴까요?'), findsOneWidget);
@@ -213,6 +223,9 @@ void main() {
     final api = MemberApi(
       client: MockClient((request) async {
         calls.add(request.url);
+        if (request.url.path.startsWith('/ground/reservation/customer/')) {
+          return http.Response('{"results":[]}', 200);
+        }
         final canceled = request.url.queryParameters['r_category'] == '2';
         final payment = request.url.path.contains('/payment/');
         return http.Response.bytes(
@@ -266,7 +279,10 @@ void main() {
     expect(calls.last.queryParameters['r_category'], '2');
     container.read(sportProvider.notifier).select(3);
     await tester.pumpAndSettle();
-    expect(calls.last.path, '/match/reservation/customer/member_03');
+    expect(
+      calls.map((uri) => uri.path),
+      contains('/match/reservation/customer/member_03'),
+    );
   });
 
   testWidgets('구장 이름과 주소 검색을 분리', (tester) async {
@@ -328,6 +344,9 @@ void main() {
     var saved = '';
     final api = MemberApi(
       client: MockClient((request) async {
+        if (request.url.path.startsWith('/ground/reservation/customer/')) {
+          return http.Response('{"results":[]}', 200);
+        }
         if (request.method == 'DELETE') {
           expect(request.url.path, '/cancel/reservation/7');
           expect(request.url.queryParameters['c_id_seq'], 'member_01');
@@ -607,3 +626,4 @@ void main() {
 // 최종 수정 일 : 2026-10-26 / 작업자 : 양태건
 
 // 최종 수정 일 : 2026-10-27 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준

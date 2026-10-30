@@ -12,7 +12,6 @@
 #   '1' ~ '3'은 매니저 취소 사유(본사 앱 버튼)라 회원은 고를 수 없고,
 #   글로 '1' ~ '3', '0'만 입력하면 매니저 취소·예약 상태로 잘못 보이므로 422로 막습니다.
 import logging
-from datetime import date
 
 import pymysql
 from fastapi import APIRouter, HTTPException, Query
@@ -23,7 +22,9 @@ from ..match.reservation_status import (
     RESERVATION_RENTAL,
     RESERVED_CANCEL_CODES,
     category_condition,
+    cancellation_allowed,
     is_canceled,
+    reservation_type_condition,
 )
 from ..database import connect  # 공용 DB 연결 함수 (python/FastAPI/database.py)
 
@@ -35,6 +36,15 @@ logger = logging.getLogger(__name__)
 # 수정일 2026.10.26
 # 예약 구분 값 (reservation.r_category)
 CATEGORY_CANCELED = 2   # 취소
+
+# ************************
+# 버그 확인 일 : 2026-10-30 / 작업자 : 최현준
+# 1. 발생 위치 : 회원 예약 취소 가능 조건
+# 2. 내용 : 성사된 경기는 시작 시간과 무관하게 취소가 차단됨
+# 3. 조치 : 한국 시간 기준 시작 1시간 전부터 차단하고 성사 슬롯을 재개방
+# 4. 테스트 : 시간 경계와 성사 후 취소·상태 갱신 Mock 테스트
+# 5. 보완 : 실제 DB·기기 연동 검증 및 알림 재성사 처리 확인 필요
+# ************************
 
 
 # 중간 수정 작성자 - 신현진
@@ -59,13 +69,21 @@ def delete_customer_reservation(
     try:
         connection = connect()  # DB 연결
         with connection.cursor() as cursor:  # SQL을 실행할 커서 (with가 끝나면 자동으로 닫힘)
+            # 예약 생성과 같은 순서로 구장을 먼저 잠가 정원·성사 상태 경합을 방지합니다.
+            cursor.execute("SELECT g_code FROM reservation WHERE r_seq = %s", (r_seq,))
+            target = cursor.fetchone()
+            if target is None:
+                raise HTTPException(status_code=404, detail="존재하지 않는 예약 번호입니다.")
+            cursor.execute("SELECT g_code FROM ground WHERE g_code = %s FOR UPDATE", (target['g_code'],))
+            if cursor.fetchone() is None:
+                raise HTTPException(status_code=404, detail="존재하지 않는 구장 코드입니다.")
             # 중간 수정 작성자 - 신현진
             # 수정일 2026.10.26
             # 1) 취소할 예약 조회
             # FOR UPDATE : 취소하는 동안 다른 요청이 이 예약을 바꾸지 못하게 잠금
             # reservation_category : 구장대여(2)는 이 API로 취소하지 않도록 구분값도 함께 조회 (2026.10.26 신현진)
             sql = """
-                SELECT r_seq, c_id_seq, g_code, r_date, r_check, reservation_category, r_category, r_c_category
+                SELECT r_seq, c_id_seq, g_code, r_date, rs_time, r_check, reservation_category, r_category, r_c_category
                 FROM reservation
                 WHERE r_seq = %s
                 FOR UPDATE
@@ -97,14 +115,9 @@ def delete_customer_reservation(
             if is_canceled(reservation):
                 raise HTTPException(status_code=409, detail="이미 취소된 예약입니다.")
 
-            # 3) 매치 성사 여부 확인 (r_check = 1 이면 인원이 다 차서 매치 확정)
-            # DB에는 0/1로 저장되어 있어서 bool()로 true/false 변환
-            if bool(reservation["r_check"]):
-                raise HTTPException(status_code=409, detail="매치가 성사된 예약은 취소할 수 없습니다.")
-
-            # 4) 지난 날짜 예약인지 확인
-            if reservation["r_date"] < date.today():
-                raise HTTPException(status_code=409, detail="이미 지난 예약은 취소할 수 없습니다.")
+            # 성사 여부가 아니라 경기 시작 1시간 전부터 취소를 제한합니다.
+            if not cancellation_allowed(reservation["r_date"], reservation["rs_time"]):
+                raise HTTPException(status_code=409, detail="경기 시작 1시간 전부터는 취소할 수 없습니다.")
 
             # 중간 수정 작성자 - 신현진
             # 수정일 2026.10.26
@@ -126,6 +139,13 @@ def delete_customer_reservation(
             )
             if cursor.rowcount == 0:
                 raise HTTPException(status_code=409, detail="이미 취소된 예약입니다.")
+            # 성사 이후 한 자리가 취소되면 남은 동일 슬롯도 미성사로 되돌립니다.
+            if reservation['r_check']:
+                cursor.execute(
+                    f"""UPDATE reservation SET r_check=0 WHERE g_code=%s AND r_date=%s AND rs_time=%s
+                        AND {category_condition(False)} AND {reservation_type_condition(RESERVATION_MATCH)}""",
+                    (reservation['g_code'], reservation['r_date'], reservation['rs_time']),
+                )
         # 중간 수정 작성자 - 신현진
         # 수정일 2026.10.28
         # 응답의 취소 사유 : 저장한 글 그대로 ('4'로 보냈으면 "기타")
@@ -165,3 +185,4 @@ def delete_customer_reservation(
 # 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (문자열 예약 분류로 대여 취소 경로 차단)
 # 최종 수정 일 : 2026-10-28 / 작업자 : 양태건 / 수정자 : 신현진 (구장대여 예약 취소 분리, 회원 취소 사유 글 검사)
 # 최종 수정 일 : 2026-10-29 / 작업자 : 최현준 (main 취소 사유 규칙과 문자열 예약 분류 처리 통합)
+# 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (경기 시작 1시간 전 취소 제한)

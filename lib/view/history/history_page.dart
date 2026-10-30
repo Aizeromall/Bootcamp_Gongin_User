@@ -1,5 +1,7 @@
 // 작업자 : 최현준
 // 최초 작업 일 : 2026-10-24
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -11,6 +13,7 @@ import '../shared/ui.dart';
 import '../shared/member_components.dart';
 import '../shared/member_style.dart';
 import 'reservation_detail_page.dart';
+import 'cancellation_time.dart';
 
 class HistoryPage extends ConsumerStatefulWidget {
   const HistoryPage({super.key});
@@ -22,6 +25,21 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
   String kind = 'reservation';
   bool cancelBusy = false;
   String? memberId;
+  Timer? cutoffTimer;
+  @override
+  void initState() {
+    super.initState();
+    cutoffTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    cutoffTimer?.cancel();
+    super.dispose();
+  }
+
   // 수정 일 : 2026-10-28 / 작업자 : 양태건
   // 수정 일 : 2026-10-30 / 작업자 : 김병재
   // 종목 Dropdown 제거: 가입한 모든 종목의 내역을 합쳐 보여주고, 새로고침 시 종목별 조회를 모두 갱신합니다.
@@ -87,7 +105,7 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
       await ref
           .read(memberApiProvider)
           .request(
-            '/cancel/reservation/${row['r_seq']}',
+            '${'${row['reservation_category']}' == '2' ? '/ground/reservation' : '/cancel/reservation'}/${row['r_seq']}',
             method: 'DELETE',
             query: {'c_id_seq': id, 'r_c_category': reason},
           );
@@ -159,6 +177,8 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
                 color: kind == 'cancel' ? Colors.red : MemberStyle.blue,
               ),
               MemberStatusBadge(sports[sportOfMember(id)] ?? ''),
+              if ('${row['reservation_category']}' == '2')
+                const MemberStatusBadge('구장 전체 대여'),
             ],
           ),
           const SizedBox(height: 12),
@@ -174,8 +194,10 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
                 await Navigator.push(
                   context,
                   MaterialPageRoute<void>(
-                    builder: (_) =>
-                        ReservationDetailPage(seq: row['r_seq'] as int),
+                    builder: (_) => ReservationDetailPage(
+                      seq: row['r_seq'] as int,
+                      rental: '${row['reservation_category']}' == '2',
+                    ),
                   ),
                 );
                 if (mounted) setState(load);
@@ -185,9 +207,15 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
             ),
           ),
           const SizedBox(height: 8),
+          // 수정 일 : 2026-10-30 / 작업자 : 최현준
+          // 예약 일시를 카드의 보조 정보로 명확히 구분합니다.
           Text(
             '${row['r_date']} · ${row['rs_time']} ~ ${row['re_time']}',
-            style: const TextStyle(fontSize: 12, color: MemberStyle.muted),
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.5,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 12),
           // 디버그: 취소일 대신 실제 취소 사유를 표시합니다.
@@ -224,15 +252,18 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
                 child: const Text('결제 이어하기'),
               ),
           ],
-          if (kind != 'cancel' &&
-              row['r_check'] != true &&
-              DateTime.tryParse('${row['r_date']}') != null &&
-              !DateTime.parse('${row['r_date']}')
-                  .isBefore(DateUtils.dateOnly(DateTime.now())))
+          if (kind != 'cancel')
             TextButton.icon(
-              onPressed: cancelBusy ? null : () => cancelReservation(row, id),
+              onPressed: cancelBusy || !canCancelReservation(row)
+                  ? null
+                  : () => cancelReservation(row, id),
               icon: const Icon(Icons.cancel_outlined),
               label: const Text('예약 취소'),
+            ),
+          if (kind != 'cancel' && !canCancelReservation(row))
+            const Text(
+              '경기 시간 확인이 필요하거나 취소 가능 시간이 지났습니다.',
+              style: TextStyle(fontSize: 12, color: MemberStyle.muted),
             ),
         ],
       ),
@@ -241,3 +272,5 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
 // 최종 수정 일 : 2026-10-30 / 작업자 : 김병재 (종목 Dropdown 제거: 전 종목 예약·결제·취소 내역 통합)
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (대여 취소 경로 구분)
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준

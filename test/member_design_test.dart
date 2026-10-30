@@ -110,7 +110,7 @@ void main() {
     expect(find.textContaining('10000원'), findsOneWidget);
     await h.snapshot(tester, 'history-refined');
     await show(const GroundDetailPage(code: '1'));
-    expect(find.text('120000원'), findsOneWidget);
+    expect(find.text('전체 대여 120000원'), findsOneWidget);
     expect(find.text('실력 매칭 · 자리 예약').hitTestable(), findsOneWidget);
     await h.snapshot(tester, 'ground-refined');
     for (final size in [const Size(320, 640), const Size(390, 844)]) {

@@ -67,7 +67,7 @@ class _BoardPageState extends ConsumerState<BoardPage> {
     final filter = ref.watch(provider);
     final notifier = ref.read(provider.notifier);
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         toolbarHeight: 72,
         titleSpacing: 0,
@@ -76,10 +76,10 @@ class _BoardPageState extends ConsumerState<BoardPage> {
           children: [
             Text(
               '${sports[filter.sport]} 게시판',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
-                color: MemberStyle.ink,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 3),
@@ -138,7 +138,7 @@ class _BoardPageState extends ConsumerState<BoardPage> {
                               border: Border(
                                 bottom: BorderSide(
                                   color: filter.sport == code
-                                      ? const Color(0xFF172541)
+                                      ? Theme.of(context).colorScheme.primary
                                       : Colors.transparent,
                                   width: 2,
                                 ),
@@ -153,7 +153,7 @@ class _BoardPageState extends ConsumerState<BoardPage> {
                                     ? FontWeight.w800
                                     : FontWeight.w500,
                                 color: filter.sport == code
-                                    ? const Color(0xFF172541)
+                                    ? Theme.of(context).colorScheme.primary
                                     : MemberStyle.muted,
                               ),
                             ),
@@ -321,7 +321,7 @@ class _BoardPageState extends ConsumerState<BoardPage> {
       borderRadius: first ? BorderRadius.circular(14) : null,
     ),
     child: Material(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surface,
       borderRadius: first ? BorderRadius.circular(14) : null,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -361,10 +361,10 @@ class _BoardPageState extends ConsumerState<BoardPage> {
                   Expanded(
                     child: Text(
                       '${row['board_title']}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
-                        color: MemberStyle.ink,
+                        color: Theme.of(context).colorScheme.onSurface,
                         height: 1.5,
                       ),
                     ),
@@ -384,18 +384,20 @@ class _BoardPageState extends ConsumerState<BoardPage> {
                   Expanded(
                     child: Text(
                       '${boardDateLabel(row['board_date'])}  |  ${row['c_name'] ?? '회원'}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: MemberStyle.muted,
+                      // 수정 일 : 2026-10-30 / 작업자 : 최현준
+                      // 게시글의 작성 정보와 조회 수를 읽기 쉽게 표시합니다.
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ),
                   if (row['board_views'] != null)
                     Text(
                       '조회 ${row['board_views']}',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: MemberStyle.muted,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                 ],
@@ -409,3 +411,5 @@ class _BoardPageState extends ConsumerState<BoardPage> {
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
 // 최종 수정 일 : 2026-10-30 / 작업자 : 김병재 (글쓰기 종목의 내 회원 ID로 작성)
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (게시판 테마 대응)
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준

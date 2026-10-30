@@ -154,6 +154,9 @@ void main() {
   testWidgets('예약내역은 가입한 모든 종목을 합쳐 표시', (tester) async {
     final client = MockClient((r) async {
       if (r.url.path.contains('/payment/')) return response({'results': []});
+      if (r.url.path.startsWith('/ground/reservation/customer/')) {
+        return response({'results': []});
+      }
       final soccer = r.url.path.endsWith('member_01');
       return response({
         'results': [
@@ -199,3 +202,4 @@ void main() {
   });
 }
 // 최종 수정 일 : 2026-10-30 / 작업자 : 김병재
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (개인 예약·전체 대여 Mock 분리)

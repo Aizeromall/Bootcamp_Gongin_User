@@ -20,6 +20,7 @@ import 'package:bootcamp_project_gongin_admin_app/view/team_match/team_match_pos
 import 'package:bootcamp_project_gongin_admin_app/view/sanction/sanction_page.dart';
 import 'package:bootcamp_project_gongin_admin_app/view/result/result_page.dart';
 import 'package:bootcamp_project_gongin_admin_app/view/auth/register_page.dart';
+import 'package:bootcamp_project_gongin_admin_app/view/history/reservation_detail_page.dart';
 
 http.Response response(Object body, [int status = 200]) =>
     http.Response.bytes(utf8.encode(jsonEncode(body)), status);
@@ -66,6 +67,52 @@ Future<void> snapshot(WidgetTester tester, String name) async {
 }
 
 void main() {
+  testWidgets('예약 상세의 취소 버튼은 성사와 무관하게 보이고 시간 경계 후 비활성화', (tester) async {
+    for (final past in [false, true]) {
+      final day = DateTime.now().toUtc().add(Duration(days: past ? -2 : 2));
+      final dayText =
+          '${day.year.toString().padLeft(4, '0')}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
+      final container = setup(
+        (_) async => response({
+          'c_id_seq': 'member_01',
+          'g_name': '테스트 구장',
+          'r_date': dayText,
+          'rs_time': '08:00',
+          're_time': '10:00',
+          'r_check': true,
+          'reservation_category': '1',
+          'is_canceled': false,
+          'is_paid': false,
+        }),
+      );
+      await tester.pumpWidget(
+        app(container, const ReservationDetailPage(seq: 7)),
+      );
+      await tester.pumpAndSettle();
+      final button = tester.widget<OutlinedButton>(
+        find.widgetWithText(OutlinedButton, '예약 취소'),
+      );
+      expect(button.onPressed == null, past);
+      await tester.pumpWidget(const SizedBox.shrink());
+    }
+  });
+  for (final social in [false, true]) {
+    testWidgets('${social ? '간편' : '일반'} 회원가입 전화번호는 숫자만 입력', (tester) async {
+      final container = setup((_) async => response({}), login: false);
+      await tester.pumpWidget(
+        app(
+          container,
+          RegisterPage(signupTicket: social ? 'mock-ticket' : null),
+        ),
+      );
+      final phone = find.byKey(const ValueKey('c_phone'));
+      await tester.enterText(phone, '010-12a3 45!67');
+      expect(
+        tester.widget<TextFormField>(phone).controller!.text,
+        '0101234567',
+      );
+    });
+  }
   // 수정 일 : 2026-10-28 / 작업자 : 양태건
   testWidgets('시작·로그인·MY 흐름과 실제 API 메뉴', (tester) async {
     final font = FontLoader('IBM Plex Sans KR')
@@ -162,7 +209,15 @@ void main() {
       paths.add(r.url.path);
       if (r.method == 'POST') {
         body = Map<String, dynamic>.from(jsonDecode(r.body));
-        return response({'r_seq': 19}, 201);
+        return response({
+          'r_seq': 19,
+          'payment': {
+            'p_num': '3_1',
+            'p_amount': '100000',
+            'p_method': '카드 결제',
+            'p_date': '2100-01-01',
+          },
+        }, 201);
       }
       return response({
         'slots': [
@@ -199,7 +254,17 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('08:00'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('예약하고 결제 선택'));
+    await tester.tap(find.text('결제 수단 선택'));
+    await tester.pumpAndSettle();
+    expect(paths, isNot(contains('/ground/reservation')));
+    expect(find.byType(PaymentPage), findsOneWidget);
+    expect(
+      tester.widget<PaymentPage>(find.byType(PaymentPage)).expectedAmount,
+      100000,
+    );
+    await tester.tap(find.text('결제 기록 저장'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('기록 저장'));
     await tester.pumpAndSettle();
     expect(
       paths,
@@ -207,6 +272,7 @@ void main() {
     );
     expect(body?['c_id_seq'], 'member_01');
     expect(body?['rs_time'], '08:00');
+    expect(body?['p_method'], '카드 결제');
     expect(find.byType(PaymentPage), findsOneWidget);
     expect(
       tester.widget<PaymentPage>(find.byType(PaymentPage)).expectedAmount,

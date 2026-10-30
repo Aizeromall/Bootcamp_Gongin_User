@@ -7,6 +7,7 @@ import 'vm/auth_refresh_state.dart';
 import 'vm/member_state.dart';
 import 'vm/notification_state.dart';
 import 'vm/social_login_state.dart';
+import 'vm/theme_state.dart';
 import 'view/history/reservation_detail_page.dart';
 import 'view/chat/chat_page.dart';
 import 'view/shared/member_style.dart';
@@ -134,6 +135,36 @@ class _MyAppState extends ConsumerState<MyApp> {
       navigatorKey: navigator,
       title: '공IN 중개사',
       debugShowCheckedModeBanner: false,
+      themeMode: ref.watch(themeModeProvider),
+      darkTheme: ThemeData(
+        useMaterial3: true,
+        fontFamily: 'IBM Plex Sans KR',
+        fontFamilyFallback: const ['Apple Color Emoji', 'Noto Color Emoji'],
+        // 수정 일 : 2026-10-30 / 작업자 : 최현준
+        // 라이트·다크 화면에서 동일한 본문 크기와 줄 간격을 사용합니다.
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(fontSize: 15, height: 1.55),
+          bodyMedium: TextStyle(fontSize: 14, height: 1.5),
+          titleLarge: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
+          titleMedium: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: MemberStyle.blue,
+          brightness: Brightness.dark,
+          surface: const Color(0xFF141922),
+        ),
+        scaffoldBackgroundColor: const Color(0xFF10151D),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF10151D),
+          foregroundColor: Color(0xFFE7ECF5),
+          surfaceTintColor: Colors.transparent,
+        ),
+        inputDecorationTheme: const InputDecorationTheme(
+          border: OutlineInputBorder(),
+          filled: true,
+          fillColor: Color(0xFF242C38),
+        ),
+      ),
       theme: ThemeData(
         fontFamily: 'IBM Plex Sans KR',
         fontFamilyFallback: const ['Apple Color Emoji', 'Noto Color Emoji'],
@@ -165,10 +196,10 @@ class _MyAppState extends ConsumerState<MyApp> {
         // 수정 일 : 2026-10-28 / 작업자 : 양태건
         // 목업의 작은 제목·본문·윤곽선 카드를 공통 적용합니다.
         textTheme: const TextTheme(
-          bodyLarge: TextStyle(fontSize: 14, height: 1.55),
-          bodyMedium: TextStyle(fontSize: 13, height: 1.5),
-          titleLarge: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-          titleMedium: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+          bodyLarge: TextStyle(fontSize: 15, height: 1.55),
+          bodyMedium: TextStyle(fontSize: 14, height: 1.5),
+          titleLarge: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
+          titleMedium: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
@@ -262,3 +293,5 @@ class _MyAppState extends ConsumerState<MyApp> {
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
 // 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (FCM 수신 및 기존 화면 연결)
 // 최종 수정 일 : 2026-10-30 / 작업자 : 김병재 (앱 재실행 시 자동 로그인·로그인 토큰 보안 저장)
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (화면 모드 및 다크 테마 연결)
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준

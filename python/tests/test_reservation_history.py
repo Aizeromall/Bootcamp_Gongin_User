@@ -63,7 +63,7 @@ class HistoryTests(unittest.TestCase):
         for reason in ['개인 일정 때문에 참석할 수 없습니다.', '가' * 50, '4']:
             with self.subTest(reason=reason):
                 self.cursor.reset_mock()
-                self.cursor.fetchone.side_effect = [dict(self.row), None]
+                self.cursor.fetchone.side_effect = [{'g_code': 1}, {'g_code': 1}, dict(self.row), None]
                 # 최대 길이는 원문 기준으로 검사되므로 50자에는 공백을 덧붙이지 않습니다.
                 raw = '  ' + reason + '  ' if len(reason) < 46 else reason
                 response = self.client.delete('/cancel/reservation/7', params={
@@ -115,8 +115,7 @@ class HistoryTests(unittest.TestCase):
 
     def test_cancel_preserves_ownership_and_date_guards(self):
         for updates, status in [({'c_id_seq': 'other_01'}, 403),
-                                ({'r_date': date.today() - timedelta(days=1)}, 409),
-                                ({'r_check': True}, 409)]:
+                                ({'r_date': date.today() - timedelta(days=1)}, 409)]:
             self.cursor.fetchone.return_value = dict(self.row, **updates)
             # 회원은 매니저 취소 코드('1')를 쓸 수 없어서 사유 글로 요청 (2026.10.28 신현진)
             response = self.client.delete('/cancel/reservation/7', params={

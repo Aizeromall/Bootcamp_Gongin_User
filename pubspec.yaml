@@ -72,6 +72,8 @@ dependencies:
   naver_login_sdk: ^3.2.1
   # 수정 일 : 2026-10-30 / 작업자 : 김병재 (앱 재실행 시 자동 로그인용 로그인 토큰 보안 저장)
   flutter_secure_storage: ^11.2.0
+  # 화면 모드(시스템/라이트/다크) 설정을 기기에 저장합니다.
+  shared_preferences: ^2.5.6
 dev_dependencies:
   flutter_test:
     sdk: flutter

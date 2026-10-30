@@ -104,7 +104,7 @@ class _BoardRecruitmentCardState extends ConsumerState<BoardRecruitmentCard> {
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: MemberStyle.surface,
+        color: Theme.of(context).colorScheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: MemberStyle.line),
       ),
@@ -255,3 +255,4 @@ class _BoardRecruitmentCardState extends ConsumerState<BoardRecruitmentCard> {
   }
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (테마 대비 적용)

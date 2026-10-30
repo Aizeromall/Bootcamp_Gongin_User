@@ -5,6 +5,9 @@
 수정자 : 신현진 / 2026-10-26 (예약 구분 reservation_category 1 실력매칭 / 2 구장대여 추가)
 수정자 : 신현진 / 2026-10-28 (취소 사유 '4' 기타 추가, 회원 취소 사유 글 규칙)
 """
+from datetime import datetime, time, timedelta
+
+from ..notification.events import now_kst
 # 중간 수정 작성자 - 신현진
 # 수정일 2026.10.28
 # 취소 사유 (reservation.r_c_category, VARCHAR)
@@ -17,6 +20,24 @@ CANCEL_REASONS = {"1": "정원 미달", "2": "우천·기상 악화", "3": "노�
 #   '1' ~ '3' : 매니저 취소 코드와 같아서 본사 앱이 매니저 취소로 잘못 봄
 #   '0'       : 예약 상태(취소 아님)로 보는 값
 RESERVED_CANCEL_CODES = ("0", "1", "2", "3")
+
+
+# 수정 일 : 2026-10-30 / 작업자 : 최현준
+# MySQL TIME은 timedelta로 반환될 수 있으며 업무 시각은 한국 시각입니다.
+def cancellation_allowed(day, start_time, now=None):
+    if isinstance(start_time, timedelta):
+        offset = start_time
+    elif isinstance(start_time, time):
+        offset = timedelta(hours=start_time.hour, minutes=start_time.minute, seconds=start_time.second)
+    else:
+        parts = str(start_time).split(':')
+        if len(parts) not in (2, 3):
+            raise ValueError('예약 시작 시간을 확인할 수 없습니다.')
+        offset = timedelta(hours=int(parts[0]), minutes=int(parts[1]), seconds=int(parts[2]) if len(parts) == 3 else 0)
+    if offset < timedelta(0) or offset >= timedelta(days=1):
+        raise ValueError('예약 시작 시간이 유효하지 않습니다.')
+    start = datetime.combine(day, time.min) + offset
+    return (now or now_kst()) < start - timedelta(hours=1)
 
 
 def is_canceled(row: dict) -> bool:
@@ -64,3 +85,4 @@ def reservation_type_condition(reservation_type: str, alias: str = "") -> str:
     return f"{prefix}reservation_category = '{reservation_type}'"
 
 # 최종 수정 일 : 2026-10-28 / 작업자 : 최현준
+# 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (경기 1시간 전 취소 제한)
