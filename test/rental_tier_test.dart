@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:bootcamp_project_gongin_admin_app/service/member_api.dart';
 import 'package:bootcamp_project_gongin_admin_app/view/account/account_page.dart';
 import 'package:bootcamp_project_gongin_admin_app/view/ground/rental_availability_page.dart';
+import 'package:bootcamp_project_gongin_admin_app/view/reservation/reservation_page.dart';
 import 'package:bootcamp_project_gongin_admin_app/vm/member_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -36,13 +37,13 @@ void main() {
             : {
                 'slots': [
                   {
-                    'rs_time': '23:59',
-                    're_time': '24:00',
+                    'rs_time': '08:00',
+                    're_time': '10:00',
                     'is_available': true,
                   },
                   {
-                    'rs_time': '22:00',
-                    're_time': '24:00',
+                    'rs_time': '10:00',
+                    're_time': '12:00',
                     'is_available': false,
                   },
                 ],
@@ -81,9 +82,78 @@ void main() {
     expect(find.text('루키 1'), findsOneWidget);
     await tester.pumpWidget(wrap(const RentalAvailabilityPage()));
     await tester.pumpAndSettle();
+    expect(find.text('대관 시간을 선택해 주세요.'), findsOneWidget);
+    expect(find.text('테스트 구장'), findsNothing);
+    final tomorrow = DateTime.now().add(const Duration(days: 1));
+    await tester.tap(find.byIcon(Icons.calendar_month));
+    await tester.pumpAndSettle();
+    if (tomorrow.month != DateTime.now().month) {
+      await tester.tap(find.byTooltip('Next month'));
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(find.text('${tomorrow.day}').last);
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('rental-time-10')));
+    await tester.pumpAndSettle();
+    expect(find.text('선택한 시간에 대관 가능한 구장이 없습니다.'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('rental-time-8')));
+    await tester.pumpAndSettle();
     expect(find.text('테스트 구장'), findsOneWidget);
-    expect(find.textContaining('22:00'), findsNothing);
+    await tester.tap(find.text('테스트 구장'));
+    await tester.pumpAndSettle();
+    final page = tester.widget<ReservationPage>(find.byType(ReservationPage));
+    expect(page.initialTime, '08:00');
+    expect(
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, '결제 수단 선택'))
+          .onPressed,
+      isNotNull,
+    );
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('선택 시간이 재조회 중 또는 예약 불가면 결제 버튼을 차단한다', (tester) async {
+    final api = MemberApi(
+      client: MockClient(
+        (_) async => http.Response(
+          '{"slots":[{"rs_time":"10:00","re_time":"12:00","is_available":false}]}',
+          200,
+        ),
+      ),
+    );
+    final container = ProviderContainer(
+      overrides: [memberApiProvider.overrideWithValue(api)],
+    );
+    container.read(sessionProvider.notifier).signIn({
+      'c_id': 'member',
+      'preferred_stocks': [1],
+    });
+    addTearDown(() {
+      container.dispose();
+      api.client.close();
+    });
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          home: ReservationPage(
+            ground: const {'g_code': 1, 'g_name': '구장'},
+            rental: true,
+            initialDate: DateTime.now().add(const Duration(days: 1)),
+            initialTime: '10:00',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, '결제 수단 선택'))
+          .onPressed,
+      isNull,
+    );
+    expect(find.text('예약 불가'), findsOneWidget);
   });
 }
 // 최종 수정 일 : 2026-10-30 / 작업자 : 최현준

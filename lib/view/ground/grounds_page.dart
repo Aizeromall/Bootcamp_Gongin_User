@@ -1,6 +1,8 @@
 // 최초 작업자 : 최현준 / 최초 작업일 : 2026-10-24
 // 수정 일 : 2026-10-27 / 작업자 : 양태건
 // 첨부 홈 목업의 종목 카드·배너·바로가기·필터·목록을 실제 구장 데이터에 적용합니다.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -61,6 +63,19 @@ class _GroundsPageState extends ConsumerState<GroundsPage> {
   // 수정 일 : 2026-10-30 / 작업자 : 최현준
   // 홈의 날짜는 목록에서 안내하는 다음 경기 시간의 기준입니다.
   DateTime selectedDate = DateUtils.dateOnly(DateTime.now());
+  Timer? clockTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    // 시간 경계가 지나면 화면을 다시 열지 않아도 다음 시간대를 갱신합니다.
+    clockTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted && (ModalRoute.of(context)?.isCurrent ?? true)) {
+        setState(() {});
+      }
+    });
+  }
+
   String? get nextSlot {
     final now = DateTime.now();
     for (var hour = 8; hour <= 22; hour += 2) {
@@ -80,6 +95,7 @@ class _GroundsPageState extends ConsumerState<GroundsPage> {
   void refresh() => ref.invalidate(apiDocumentProvider(query));
   @override
   void dispose() {
+    clockTimer?.cancel();
     search.dispose();
     scroll.dispose();
     searchFocus.dispose();
@@ -545,36 +561,6 @@ class _GroundsPageState extends ConsumerState<GroundsPage> {
         ),
         child: Row(
           children: [
-            if (constraints.maxWidth >= 370) ...[
-              SizedBox(
-                width: 53,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (time.isNotEmpty) ...[
-                      const Text(
-                        '운영시간',
-                        style: TextStyle(fontSize: 9, color: MemberStyle.muted),
-                      ),
-                      Text(
-                        time.split(RegExp(r'[~～–]')).first.trim(),
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                      ),
-                    ] else
-                      const Icon(
-                        Icons.stadium_outlined,
-                        color: MemberStyle.blue,
-                        size: 27,
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 9),
-            ],
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -596,6 +582,25 @@ class _GroundsPageState extends ConsumerState<GroundsPage> {
                       color: MemberStyle.muted,
                     ),
                   ),
+                  const SizedBox(height: 5),
+                  Text(
+                    time.isEmpty ? '운영시간 확인 불가' : '운영시간 $time',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  // 수정 일 : 2026-10-30 / 작업자 : 최현준
+                  // 공통 시간대이며 실제 예약 가능 여부는 시간 선택 화면에서 확인합니다.
+                  const SizedBox(height: 5),
+                  Text(
+                    nextSlot == null ? '남은 경기 시간 없음' : '다음 경기 시간 · $nextSlot',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: MemberStyle.blue,
+                    ),
+                  ),
                   const SizedBox(height: 7),
                   // 수정 일 : 2026-10-30 / 작업자 : 최현준
                   // 선택 날짜의 다음 시간대에 신청한 회원의 평균 티어를 조회합니다.
@@ -612,7 +617,6 @@ class _GroundsPageState extends ConsumerState<GroundsPage> {
                     children: [
                       _tag(sports[sport]!, blue: true),
                       if (row['g_num'] != null) _tag('${row['g_num']}명'),
-                      if (time.isNotEmpty) _tag(time),
                     ],
                   ),
                   const SizedBox(height: 6),
@@ -723,6 +727,7 @@ class _GroundAverageTier extends ConsumerWidget {
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
 // 최종 수정 일 : 2026-10-30 / 작업자 : 최현준
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (홈 다음 경기 시간 표시)
 // 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (홈·구장 테마 대비 적용)
 // 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (구장 목록 카드 스타일 정리)
 // 최종 수정 일 : 2026-10-30 / 작업자 : 최현준
