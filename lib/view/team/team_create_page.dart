@@ -11,7 +11,10 @@ import '../shared/ui.dart';
 
 // 수정 일 : 2026-10-28 / 작업자 : 양태건
 class TeamCreatePage extends ConsumerStatefulWidget {
-  const TeamCreatePage({super.key});
+  const TeamCreatePage({super.key, this.sport});
+  // 수정 일 : 2026-10-30 / 작업자 : 김병재
+  // 팀 탭에서 고른 '팀이 없는 선호종목'으로 개설합니다. 없으면 기존처럼 현재 선택 종목을 사용합니다.
+  final int? sport;
   @override
   ConsumerState<TeamCreatePage> createState() => _TeamCreatePageState();
 }
@@ -21,6 +24,12 @@ class _TeamCreatePageState extends ConsumerState<TeamCreatePage> {
   final name = TextEditingController();
   final logo = TextEditingController();
   bool busy = false;
+
+  // 수정 일 : 2026-10-30 / 작업자 : 김병재 — 개설 종목과 그 종목의 내 회원 ID(예: member_02)
+  int get sport => widget.sport ?? ref.read(sportProvider);
+  String get memberId =>
+      '${ref.read(sessionProvider)?['c_id']}_${sport.toString().padLeft(2, '0')}';
+
   @override
   void dispose() {
     name.dispose();
@@ -37,13 +46,15 @@ class _TeamCreatePageState extends ConsumerState<TeamCreatePage> {
           .request(
             '/team/create',
             body: {
-              'c_id_seq': ref.read(memberIdProvider),
+              'c_id_seq': memberId,
               't_name': name.text.trim(),
               if (logo.text.trim().isNotEmpty) 't_logo': logo.text.trim(),
             },
           );
       if (!mounted) return;
       ref.invalidate(apiDocumentProvider);
+      // 수정 일 : 2026-10-30 / 작업자 : 김병재 — 팀 탭의 종목별 소속팀도 다시 조회합니다.
+      ref.invalidate(teamDataRefreshProvider);
       Navigator.pop(context, true);
     } catch (error) {
       if (mounted) showMessage(context, error);
@@ -78,7 +89,7 @@ class _TeamCreatePageState extends ConsumerState<TeamCreatePage> {
               ),
               const SizedBox(height: 8),
               Text(
-                '현재 종목 · ${sports[ref.watch(sportProvider)]}',
+                '개설 종목 · ${sports[widget.sport ?? ref.watch(sportProvider)]}',
                 style: const TextStyle(color: MemberStyle.blue),
               ),
               const Text(
@@ -111,3 +122,4 @@ class _TeamCreatePageState extends ConsumerState<TeamCreatePage> {
   );
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-30 / 작업자 : 김병재 (선호종목 기준 개설 종목 지정)

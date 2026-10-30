@@ -33,8 +33,13 @@ class ChatConnection {
     this.token,
     this.memberId, {
     this.open = WebSocketChannel.connect,
+    this.onExpired,
   });
   final WebSocketChannel Function(Uri) open;
+  // 수정 일 : 2026-10-30 / 작업자 : 김병재
+  // 서버가 인증 만료·거절(1008)로 연결을 닫으면 호출합니다. 채팅 토큰을 재발급하면
+  // provider가 새 토큰으로 연결을 다시 만들고, 이력은 마지막 50개부터 다시 불러옵니다.
+  final void Function()? onExpired;
   final MemberApi api;
   final int roomId;
   final String token;
@@ -94,7 +99,17 @@ class ChatConnection {
       _subscription = channel.stream.listen(
         _receive,
         onError: (Object e) => _disconnected('채팅 연결에 실패했습니다.'),
-        onDone: () => _disconnected('연결이 종료되었습니다. 재연결하거나 채팅 인증을 갱신해 주세요.'),
+        onDone: () {
+          // 수정 일 : 2026-10-30 / 작업자 : 김병재
+          // 1008은 서버의 토큰 만료·인증 실패 종료 코드입니다. 이때만 자동 재인증을 요청합니다.
+          // 전송 중이던 입력은 저장 여부가 불명확하므로 자동 재전송하지 않습니다.
+          final expired =
+              !_closed && onExpired != null && channel.closeCode == 1008;
+          _disconnected(
+            expired ? '채팅 인증을 갱신하는 중입니다…' : '연결이 종료되었습니다. 다시 연결해 주세요.',
+          );
+          if (expired) onExpired?.call();
+        },
       );
       channel.sink.add(jsonEncode({'type': 'auth', 'access_token': token}));
       _authTimer = Timer(const Duration(seconds: 12), () {
@@ -195,3 +210,4 @@ class ChatConnection {
   }
 }
 // 최종 수정 일 : 2026-10-27 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-30 / 작업자 : 김병재 (인증 만료 종료 시 자동 재인증 요청)

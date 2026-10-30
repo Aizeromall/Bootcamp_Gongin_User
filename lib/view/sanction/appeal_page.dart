@@ -34,7 +34,8 @@ class _AppealPageState extends ConsumerState<AppealPage> {
 
   Future<void> submit() async {
     if (busy || !form.currentState!.validate()) return;
-    final id = ref.read(memberIdProvider);
+    // 수정 일 : 2026-10-30 / 작업자 : 김병재 — 제재를 받은 종목 회원 ID로 이의신청합니다.
+    final id = '${widget.sanction?['member_id'] ?? ref.read(memberIdProvider)}';
     setState(() => busy = true);
     try {
       await ref
@@ -68,7 +69,6 @@ class _AppealPageState extends ConsumerState<AppealPage> {
 
   @override
   Widget build(BuildContext context) {
-    final id = ref.watch(memberIdProvider);
     final writing = widget.sanction != null;
     return Scaffold(
       appBar: AppBar(title: Text(writing ? '이의신청' : '이의신청 내역')),
@@ -173,8 +173,10 @@ class _AppealPageState extends ConsumerState<AppealPage> {
                   ),
                 ]
               : [
+                  // 수정 일 : 2026-10-30 / 작업자 : 김병재 — 모든 종목의 이의신청 내역을 합쳐 표시
                   ApiContent(
-                    query: apiQuery('/appeal/list', {'c_id_seq': id}),
+                    allMembers: true,
+                    query: apiQuery('/appeal/list', {'c_id_seq': '{id}'}),
                     builder: (data) => FeedItems(
                       data: data,
                       item: (row) => MemberPanel(
@@ -230,3 +232,4 @@ class _AppealPageState extends ConsumerState<AppealPage> {
   }
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-30 / 작업자 : 김병재 (제재 종목 회원 ID로 이의신청·전 종목 내역)

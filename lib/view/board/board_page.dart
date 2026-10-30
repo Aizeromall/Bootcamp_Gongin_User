@@ -33,7 +33,9 @@ class _BoardPageState extends ConsumerState<BoardPage> {
   }
 
   Future<void> write(BoardFilter filter) async {
-    final id = ref.read(memberIdProvider);
+    // 수정 일 : 2026-10-30 / 작업자 : 김병재
+    // 종목 Dropdown 제거: 작성자는 글쓰기에서 고른 종목의 내 회원 ID입니다. 가입하지 않은 종목이면 저장하지 않고 안내합니다.
+    final ids = ref.read(memberIdsProvider);
     await showDialog<bool>(
       context: context,
       builder: (_) => BoardEditor(
@@ -42,6 +44,14 @@ class _BoardPageState extends ConsumerState<BoardPage> {
           'board_category': filter.category == '전체' ? '자유' : filter.category,
         },
         save: (body) async {
+          final sport = sports.entries
+              .where((entry) => entry.value == body['event_category'])
+              .map((entry) => entry.key)
+              .firstOrNull;
+          final id = myMemberIdFor(ids, sport);
+          if (id == null) {
+            throw Exception('가입한 종목의 게시판에만 글을 작성할 수 있습니다.');
+          }
           await ref
               .read(memberApiProvider)
               .request('/board/insert', body: {...body, 'c_id_seq': id});
@@ -398,3 +408,4 @@ class _BoardPageState extends ConsumerState<BoardPage> {
   );
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-30 / 작업자 : 김병재 (글쓰기 종목의 내 회원 ID로 작성)

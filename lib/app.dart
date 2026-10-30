@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'vm/auth_refresh_state.dart';
 import 'vm/member_state.dart';
 import 'vm/notification_state.dart';
 import 'vm/social_login_state.dart';
@@ -58,6 +59,25 @@ class _MyAppState extends ConsumerState<MyApp> {
   void initState() {
     super.initState();
     started = ref.read(sessionProvider) != null;
+    // 수정 일 : 2026-10-30 / 작업자 : 김병재
+    // 앱 재실행 시 보안 저장소의 로그인 토큰으로 자동 로그인을 시도합니다.
+    if (!started) restoreSession();
+  }
+
+  // 수정 일 : 2026-10-30 / 작업자 : 김병재
+  // 자동 로그인: 성공하면 일반 로그인과 같은 acceptMemberSession으로 세션·종목을 설정합니다.
+  // 실패(저장 토큰 없음·30일 경과·서버 연결 실패)하면 기존 시작·로그인 화면을 그대로 사용합니다.
+  Future<void> restoreSession() async {
+    final result = await ref.read(authRefreshProvider).restore();
+    // 확인 중 사용자가 직접 로그인했다면 그 세션을 덮어쓰지 않습니다.
+    if (!mounted || result == null || ref.read(sessionProvider) != null) {
+      return;
+    }
+    try {
+      acceptMemberSession(ref, result);
+    } catch (_) {
+      // 가입 종목 정보가 없는 응답은 자동 로그인하지 않고 시작 화면을 유지합니다.
+    }
   }
 
   @override
@@ -92,6 +112,16 @@ class _MyAppState extends ConsumerState<MyApp> {
       });
     });
     ref.listen(sessionProvider, (previous, next) {
+      // 수정 일 : 2026-10-30 / 작업자 : 김병재
+      // 모든 로그인 경로(일반·간편·가입·복구·회원정보 수정)의 새 토큰을 보안 저장소에 저장하고,
+      // 로그아웃·계정 삭제 신청으로 세션이 비워지면 저장된 토큰도 지워 자동 로그인을 막습니다.
+      final storage = ref.read(sessionStorageProvider);
+      final token = next?['access_token'];
+      if (next == null) {
+        storage.clear();
+      } else if (token is String && token.isNotEmpty) {
+        storage.save(token);
+      }
       if (next == null && previous != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
@@ -219,6 +249,8 @@ class _MyAppState extends ConsumerState<MyApp> {
           ),
         ),
       ),
+      // 수정 일 : 2026-10-30 / 작업자 : 김병재
+      // 자동 로그인 확인 중에도 기존 시작 화면을 그대로 보여주고, 성공하면 세션 변경으로 홈으로 이동합니다.
       home: ref.watch(sessionProvider) == null
           ? started
                 ? const LoginPage()
@@ -229,3 +261,4 @@ class _MyAppState extends ConsumerState<MyApp> {
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
 // 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (FCM 수신 및 기존 화면 연결)
+// 최종 수정 일 : 2026-10-30 / 작업자 : 김병재 (앱 재실행 시 자동 로그인·로그인 토큰 보안 저장)

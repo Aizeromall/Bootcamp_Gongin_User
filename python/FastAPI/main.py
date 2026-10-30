@@ -39,6 +39,10 @@ if __package__ in (None, ""):
     # 수정일 2026.10.29
     # 회원·팀 등급 점수 조회 router (python/FastAPI/rating 폴더)
     from FastAPI.rating import rating_router
+    # 수정 일 : 2026-10-30 / 작업자 : 김병재
+    # 로그인 토큰 갱신(/auth/refresh)과 내 소속팀 조회(/my_team) router
+    from FastAPI.auth.refresh_token import router as refresh_token_router
+    from FastAPI.my_team.my_team import router as my_team_router
 else:
     # `python -m FastAPI.main` 모듈 실행에서는 일반 상대 import를 사용합니다.
     from .auth import auth_router
@@ -65,6 +69,10 @@ else:
     # 수정일 2026.10.29
     # 회원·팀 등급 점수 조회 router (python/FastAPI/rating 폴더)
     from .rating import rating_router
+    # 수정 일 : 2026-10-30 / 작업자 : 김병재
+    # 로그인 토큰 갱신(/auth/refresh)과 내 소속팀 조회(/my_team) router
+    from .auth.refresh_token import router as refresh_token_router
+    from .my_team.my_team import router as my_team_router
 
 # main.py → FastAPI → python → 프로젝트 루트 순서로 서버 환경 설정을 읽습니다.
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
@@ -175,6 +183,14 @@ app.include_router(chat_router)
 # 알림 기기 router: 일반 로그인 JWT로 본인 FCM 토큰만 등록·해제합니다.
 app.include_router(notification_router)
 
+# 수정 일 : 2026-10-30 / 작업자 : 김병재
+# 토큰 갱신 router: 만료 후 7일 이내의 로그인 JWT를 POST /auth/refresh로 다시 발급합니다.
+# 기존 auth/__init__.py를 수정하지 않도록 main.py에서 /auth prefix로 직접 연결합니다.
+app.include_router(refresh_token_router, prefix="/auth", tags=["Auth Refresh"])
+# 내 소속팀 router: 로그인 JWT의 모든 종목별 소속팀을 GET /my_team으로 조회합니다.
+# /my_team 주소는 my_team/my_team.py에서 붙이므로 여기서는 prefix 없이 등록합니다.
+app.include_router(my_team_router)
+
 
 if __name__ == "__main__":
     import uvicorn
@@ -197,3 +213,4 @@ if __name__ == "__main__":
 # 최종 수정 일 : 2026-10-27 / 수정자 : 최현준 (공지·게시판 router 동시 유지 및 main 충돌 해결)
 # 최종 수정 일 : 2026-10-27 / 작업자 : 최현준 (알림 기기 router 연결)
 # 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (신고 router 진입점 복구)
+# 최종 수정 일 : 2026-10-30 / 작업자 : 김병재 (토큰 갱신·내 소속팀 router 등록)

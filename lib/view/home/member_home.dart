@@ -47,12 +47,8 @@ class _MemberHomeState extends ConsumerState<MemberHome> {
   );
   @override
   Widget build(BuildContext context) {
-    final session = ref.watch(sessionProvider)!;
-    final available = (session['preferred_stocks'] as List)
-        .map((v) => int.tryParse('$v'))
-        .whereType<int>()
-        .where(sports.containsKey)
-        .toSet();
+    // 수정 일 : 2026-10-30 / 작업자 : 김병재
+    // 종목 Dropdown 제거: 탭 화면들이 가입한 모든 종목 정보를 함께 보여주므로 상단 종목 선택을 없앴습니다.
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -157,25 +153,6 @@ class _MemberHomeState extends ConsumerState<MemberHome> {
               ),
             ),
           ),
-          if (tab != 0)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: DropdownButton<int>(
-                value: ref.watch(sportProvider),
-                underline: const SizedBox(),
-                items: available
-                    .map(
-                      (s) =>
-                          DropdownMenuItem(value: s, child: Text(sports[s]!)),
-                    )
-                    .toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    ref.read(sportProvider.notifier).select(value);
-                  }
-                },
-              ),
-            ),
           IconButton(
             tooltip: '공지사항',
             icon: const Icon(Icons.notifications_none_rounded, size: 29),
@@ -254,3 +231,4 @@ class _MemberHomeState extends ConsumerState<MemberHome> {
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
 // 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (푸시 연결 상태 및 재시도)
+// 최종 수정 일 : 2026-10-30 / 작업자 : 김병재 (상단 종목 Dropdown 제거)

@@ -70,6 +70,8 @@ dependencies:
   google_sign_in: ^7.2.0
   kakao_flutter_sdk_user: ^1.9.7+3
   naver_login_sdk: ^3.2.1
+  # 수정 일 : 2026-10-30 / 작업자 : 김병재 (앱 재실행 시 자동 로그인용 로그인 토큰 보안 저장)
+  flutter_secure_storage: ^11.2.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
