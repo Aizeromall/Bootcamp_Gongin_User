@@ -9,6 +9,7 @@ import '../../vm/board_state.dart';
 import '../shared/api_content.dart';
 import '../shared/member_style.dart';
 import '../shared/ui.dart';
+import '../shared/team_lineup_picker.dart';
 import 'board_match_card.dart';
 
 // 수정 일 : 2026-10-28 / 작업자 : 양태건
@@ -22,34 +23,32 @@ class BoardMatchAction extends ConsumerStatefulWidget {
 
 class _BoardMatchActionState extends ConsumerState<BoardMatchAction> {
   bool busy = false;
+  List<String> lineup = [];
   int get seq => widget.post['bulletin_seq'] as int;
   Future<void> request(String id, ApiQuery query) async {
     if (busy) return;
     setState(() => busy = true);
     try {
-      final ok = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('매칭신청'),
-          content: Text('${widget.post['board_title']}\n이 경기에 팀 매칭을 신청하시겠어요?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('돌아가기'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('확인'),
-            ),
-          ],
-        ),
+      final session = ref.read(sessionProvider);
+      final token = session?['access_token'];
+      if (token is! String || token.isEmpty) throw Exception('다시 로그인해 주세요.');
+      final chosen = await selectTeamLineup(
+        context,
+        query: (memberId: id, rentalId: null, postId: seq),
+        initial: lineup,
       );
-      if (ok != true || !mounted) return;
+      if (chosen == null ||
+          !mounted ||
+          !identical(session, ref.read(sessionProvider))) {
+        return;
+      }
+      lineup = chosen;
       await ref
           .read(memberApiProvider)
           .request(
             '/team_match/request',
-            body: {'c_id_seq': id, 'bulletin_seq': seq},
+            body: {'c_id_seq': id, 'bulletin_seq': seq, 'member_ids': lineup},
+            accessToken: token,
           );
       if (!mounted) return;
       ref.invalidate(apiDocumentProvider(query));
@@ -216,3 +215,4 @@ class _BoardMatchActionState extends ConsumerState<BoardMatchAction> {
   }
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준

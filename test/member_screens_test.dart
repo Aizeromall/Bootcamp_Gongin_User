@@ -36,6 +36,7 @@ ProviderContainer setup(
       'c_id': 'member',
       'c_name': '김민준',
       'preferred_stocks': [1],
+      'access_token': 'mock-token',
     });
   }
   addTearDown(() {
@@ -215,6 +216,14 @@ void main() {
   testWidgets('매칭 글은 선택한 대여 예약 번호를 전송', (tester) async {
     Map<String, dynamic>? saved;
     final container = setup((r) async {
+      if (r.url.path == '/team_match/lineup-options') {
+        return response({
+          'required_count': 1,
+          'results': [
+            {'c_id_seq': 'member_01', 'c_name': '회원'},
+          ],
+        });
+      }
       if (r.method == 'POST') {
         saved = Map<String, dynamic>.from(jsonDecode(r.body));
         return response({'bulletin_seq': 4}, 201);
@@ -250,10 +259,15 @@ void main() {
     await tester.enterText(find.byType(TextField), '상대 팀 구해요');
     await tester.tap(find.text('매칭 글 등록'));
     await tester.pumpAndSettle();
+    await tester.tap(find.byType(CheckboxListTile));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('선택 완료'));
+    await tester.pumpAndSettle();
     expect(saved, {
       'c_id_seq': 'member_01',
       'r_seq': 7,
       'board_content': '상대 팀 구해요',
+      'member_ids': ['member_01'],
     });
     expect(find.text('목록'), findsOneWidget);
   });
@@ -316,3 +330,4 @@ void main() {
   });
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준

@@ -28,6 +28,7 @@ ProviderContainer setup(Future<http.Response> Function(http.Request) handler) {
     'c_id': 'member',
     'c_name': '김민준',
     'preferred_stocks': [1, 4],
+    'access_token': 'mock-token',
   });
   addTearDown(() {
     container.dispose();
@@ -269,9 +270,18 @@ void main() {
         expect(jsonDecode(r.body), {
           'c_id_seq': 'member_01',
           'bulletin_seq': 10,
+          'member_ids': ['member_01'],
         });
         requested = true;
         return jsonResponse({'result': 'OK'}, 201);
+      }
+      if (r.url.path == '/team_match/lineup-options') {
+        return jsonResponse({
+          'required_count': 1,
+          'results': [
+            {'c_id_seq': 'member_01', 'c_name': '회원'},
+          ],
+        });
       }
       return jsonResponse({'results': []});
     });
@@ -284,7 +294,9 @@ void main() {
     await tester.ensureVisible(find.widgetWithText(FilledButton, '매칭 신청'));
     await tester.tap(find.widgetWithText(FilledButton, '매칭 신청'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('확인'));
+    await tester.tap(find.byType(CheckboxListTile));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('선택 완료'));
     await tester.pumpAndSettle();
     expect(requested, true);
     expect(
@@ -355,3 +367,4 @@ void main() {
   });
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준

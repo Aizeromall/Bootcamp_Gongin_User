@@ -12,6 +12,7 @@ from fastapi import APIRouter, HTTPException, Path, Query
 
 from ..database import connect
 from .insert import BoardCategory, EventCategory
+from ..team_match.lineup import visible
 
 # 수정 일 : 2026-10-26 / 작업자 : 양태건
 # 실제 DB board_a_write 사용: comment_seq=0은 게시글, 양수는 댓글입니다.
@@ -70,6 +71,9 @@ def select_boards(
     finally:
         if connection is not None:
             connection.close()
+    for row in rows:
+        if 'board_content' in row:
+            row['board_content'] = visible(row['board_content'])
     return {"total": total, "limit": limit, "offset": offset, "results": rows}
 
 
@@ -109,6 +113,8 @@ def select_board(bulletin_seq: int = Path(gt=0)):
     finally:
         if connection is not None:
             connection.close()
+    row['board_content'] = visible(row.get('board_content'))
     return row
 
 # 최종 수정 일 : 2026-10-26 / 작업자 : 양태건
+# 최종 수정 일 : 2026-10-30 / 작업자 : 최현준

@@ -8,6 +8,7 @@ import '../../vm/board_state.dart';
 import '../../vm/member_features.dart';
 import '../shared/member_style.dart';
 import '../shared/ui.dart';
+import '../shared/team_lineup_picker.dart';
 import 'board_widgets.dart';
 
 // 수정 일 : 2026-10-28 / 작업자 : 양태건
@@ -21,37 +22,53 @@ class BoardMatchCard extends ConsumerStatefulWidget {
 
 class _BoardMatchCardState extends ConsumerState<BoardMatchCard> {
   bool busy = false;
+  List<String> lineup = [];
   Future<void> act(String path, String id, {int? comment}) async {
     if (busy) return;
     final session = ref.read(sessionProvider);
     setState(() => busy = true);
     try {
-      final ok = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text(
-            path.endsWith('request')
-                ? '매칭 신청'
-                : path.endsWith('accept')
-                ? '매칭 승인'
-                : '매칭 거절',
-          ),
-          content: const Text('진행하시겠어요?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('돌아가기'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('확인'),
-            ),
-          ],
-        ),
-      );
-      if (ok != true ||
-          !mounted ||
-          !identical(session, ref.read(sessionProvider))) {
+      final token = session?['access_token'];
+      if (token is! String || token.isEmpty) throw Exception('다시 로그인해 주세요.');
+      var ok = false;
+      if (path.endsWith('request')) {
+        final chosen = await selectTeamLineup(
+          context,
+          query: (memberId: id, rentalId: null, postId: widget.seq),
+          initial: lineup,
+        );
+        if (chosen != null) {
+          lineup = chosen;
+          ok = true;
+        }
+      } else {
+        ok =
+            await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: Text(
+                  path.endsWith('request')
+                      ? '매칭 신청'
+                      : path.endsWith('accept')
+                      ? '매칭 승인'
+                      : '매칭 거절',
+                ),
+                content: const Text('진행하시겠어요?'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('돌아가기'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('확인'),
+                  ),
+                ],
+              ),
+            ) ??
+            false;
+      }
+      if (!ok || !mounted || !identical(session, ref.read(sessionProvider))) {
         return;
       }
       await ref
@@ -62,7 +79,9 @@ class _BoardMatchCardState extends ConsumerState<BoardMatchCard> {
               'c_id_seq': id,
               'bulletin_seq': widget.seq,
               'comment_seq': ?comment,
+              if (path.endsWith('request')) 'member_ids': lineup,
             },
+            accessToken: token,
           );
       if (!mounted || !identical(session, ref.read(sessionProvider))) return;
       refreshBoardThread(ref, widget.seq);
@@ -304,3 +323,4 @@ class _BoardMatchCardState extends ConsumerState<BoardMatchCard> {
       );
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준

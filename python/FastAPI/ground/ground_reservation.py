@@ -34,6 +34,7 @@ from ..database import connect  # 공용 DB 연결 함수 (python/FastAPI/databa
 #   find_assigned_manager : 요일·시간대에 배정된 경기매니저 조회
 #   sport_from_customer_id : c_id_seq 끝 번호(01~04)로 종목 확인
 from ..match.reservation import TIME_SLOTS, find_assigned_manager, sport_from_customer_id
+from ..team_match.lineup import guard_participant, participant_condition, cancel_pending
 #   format_time : 시간 값 → "08:00" 형식으로 통일
 #   RESERVATION_MANAGER_JOIN : 예약 행마다 배정표 기준 매니저를 붙이는 JOIN
 from ..match.reservation_search import RESERVATION_MANAGER_JOIN, format_time
@@ -100,6 +101,7 @@ GROUND_RESERVATION_SELECT = f"""
     {RESERVATION_MANAGER_JOIN}
     LEFT JOIN pay AS p ON p.r_seq = r.r_seq
     WHERE {reservation_type_condition(RESERVATION_RENTAL, 'r')}
+      AND NOT {participant_condition('r')}
 """
 
 
@@ -387,6 +389,7 @@ def cancel_ground_reservation(
             reservation = cursor.fetchone()
             if reservation is None or reservation["reservation_category"] != RESERVATION_RENTAL:
                 raise HTTPException(status_code=404, detail="존재하지 않는 구장대여 번호입니다.")
+            guard_participant(cursor, r_seq)
 
             # 2) 본인 대여인지 확인
             if reservation["c_id_seq"] != c_id_seq:
@@ -403,6 +406,8 @@ def cancel_ground_reservation(
             # 5) 지난 날짜 대여인지 확인
             if reservation["r_date"] < date.today():
                 raise HTTPException(status_code=409, detail="이미 지난 대여는 취소할 수 없습니다.")
+            cursor.execute('SELECT r.*,g.g_num FROM reservation r JOIN ground g ON g.g_code=r.g_code WHERE r.r_seq=%s', (r_seq,))
+            cancel_pending(cursor, cursor.fetchone())
 
             # 중간 수정 작성자 - 신현진
             # 수정일 2026.10.28
@@ -465,3 +470,4 @@ def cancel_ground_reservation(
 # 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (소셜 회원 ID 입력 길이 DB 정합성 적용)
 # 최종 수정 일 : 2026-10-28 수정자 : 신현진 (회원 취소 사유 글 검사, 환불 대상 안내)
 # 최종 수정 일 : 2026-10-29 / 작업자 : 최현준 (main 환불 대상 안내와 소셜 회원 ID 길이 처리 통합)
+# 최종 수정 일 : 2026-10-30 / 작업자 : 최현준

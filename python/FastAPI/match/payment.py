@@ -13,6 +13,7 @@ from fastapi import APIRouter, Body, HTTPException, status
 
 from ..database import connect
 from .reservation_status import RESERVATION_MATCH, RESERVATION_RENTAL, is_canceled
+from ..team_match.lineup import guard_participant
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -92,6 +93,16 @@ def create_payment(
             # 작업자 : 양태건 / 최종 수정일 : 2026-10-26
             if is_canceled(reservation):
                 raise HTTPException(status_code=409, detail="취소된 예약은 결제할 수 없습니다.")
+            # ************************
+            # 버그 확인 일 : 2026-10-30 / 작업자 : 최현준
+            # 1. 발생 위치 : 구장대여 분류 예약의 결제 처리
+            # 2. 내용 : 출전자 행도 전체 대여료 결제 대상으로 인식될 수 있음
+            # 3. 조치 : 공고·신청에 연결된 출전자 예약의 별도 결제를 차단
+            # 4. 테스트 : 출전자 차단과 대표 대여 금액 Mock 회귀 검사
+            # 5. 결과·보완 : 대표 대여 결제 유지, 실제 결제 연동 검증은 별도 필요
+            # ************************
+            if reservation.get('reservation_category') == RESERVATION_RENTAL:
+                guard_participant(cursor, r_seq)
 
             # 검증된 reservation FK를 pay에도 저장하고, 예약당 한 번만 결제되게 합니다.
             cursor.execute(
@@ -159,3 +170,4 @@ def create_payment(
 # 최종 수정 일 : 2026-10-26 / 작업자 : 양태건 / 수정자 : 신현진 (구장대여 결제 금액)
 # 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (소셜 회원 ID 입력 길이 DB 정합성 적용)
 # 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (문자열 예약 분류에 따른 대여 총액 계산)
+# 최종 수정 일 : 2026-10-30 / 작업자 : 최현준

@@ -9,6 +9,7 @@ import '../shared/api_content.dart';
 import '../shared/member_components.dart';
 import '../shared/member_style.dart';
 import '../shared/ui.dart';
+import '../shared/team_lineup_picker.dart';
 
 // 수정 일 : 2026-10-28 / 작업자 : 양태건
 // 팀장이 가진 실제 구장대여를 선택하여 신청 가능한 매칭 글을 생성합니다.
@@ -21,6 +22,7 @@ class TeamMatchPostPage extends ConsumerStatefulWidget {
 class _TeamMatchPostPageState extends ConsumerState<TeamMatchPostPage> {
   final content = TextEditingController();
   int? selected;
+  List<String> lineup = [];
   bool busy = false;
   @override
   void dispose() {
@@ -31,6 +33,23 @@ class _TeamMatchPostPageState extends ConsumerState<TeamMatchPostPage> {
   Future<void> submit() async {
     if (busy || selected == null) return;
     final id = ref.read(memberIdProvider);
+    final session = ref.read(sessionProvider);
+    final token = session?['access_token'];
+    if (token is! String || token.isEmpty) {
+      showMessage(context, '다시 로그인해 주세요.');
+      return;
+    }
+    final chosen = await selectTeamLineup(
+      context,
+      query: (memberId: id, rentalId: selected, postId: null),
+      initial: lineup,
+    );
+    if (!mounted ||
+        chosen == null ||
+        !identical(session, ref.read(sessionProvider))) {
+      return;
+    }
+    lineup = chosen;
     setState(() => busy = true);
     try {
       await ref
@@ -41,7 +60,9 @@ class _TeamMatchPostPageState extends ConsumerState<TeamMatchPostPage> {
               'c_id_seq': id,
               'r_seq': selected,
               'board_content': content.text.trim(),
+              'member_ids': lineup,
             },
+            accessToken: token,
           );
       if (!mounted) return;
       ref.invalidate(
@@ -111,7 +132,10 @@ class _TeamMatchPostPageState extends ConsumerState<TeamMatchPostPage> {
                   ),
                   onTap: disabled
                       ? null
-                      : () => setState(() => selected = row['r_seq'] as int),
+                      : () => setState(() {
+                          selected = row['r_seq'] as int;
+                          lineup = [];
+                        }),
                 ),
               );
             },
@@ -134,3 +158,4 @@ class _TeamMatchPostPageState extends ConsumerState<TeamMatchPostPage> {
   }
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준
