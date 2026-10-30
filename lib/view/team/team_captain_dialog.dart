@@ -27,7 +27,9 @@ class _TeamCaptainDialogState extends ConsumerState<TeamCaptainDialog> {
   }
 
   Future<void> transfer() async {
-    if (confirming || ref.read(captainTransferProvider(widget.transferKey))) {
+    // 수정 일 : 2026-10-31 / 작업자 : 신현진 — AsyncNotifier 변환으로 처리 중 여부는 isLoading
+    if (confirming ||
+        ref.read(captainTransferProvider(widget.transferKey)).isLoading) {
       return;
     }
     if (!form.currentState!.validate()) return;
@@ -71,7 +73,10 @@ class _TeamCaptainDialogState extends ConsumerState<TeamCaptainDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final submitting = ref.watch(captainTransferProvider(widget.transferKey));
+    // 수정 일 : 2026-10-31 / 작업자 : 신현진 — 처리 중 여부는 isLoading
+    final submitting = ref
+        .watch(captainTransferProvider(widget.transferKey))
+        .isLoading;
     final busy = confirming || submitting;
     final active =
         ref.watch(sessionProvider) != null &&
@@ -130,3 +135,4 @@ class _TeamCaptainDialogState extends ConsumerState<TeamCaptainDialog> {
   }
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-31 / 작업자 : 신현진 (동작 Notifier AsyncNotifier 변환에 맞춰 isLoading 사용)

@@ -456,7 +456,8 @@ void main() {
     await tester.pump();
     expect(deletes, 1);
     expect(container.read(sessionProvider), isNotNull);
-    expect(container.read(accountActionsProvider), isTrue);
+    // 수정 일 : 2026-10-31 / 작업자 : 신현진 — AsyncNotifier 변환으로 처리 중 여부는 isLoading
+    expect(container.read(accountActionsProvider).isLoading, isTrue);
     completion.complete(
       response({
         'result': 'OK',
@@ -486,7 +487,8 @@ void main() {
     await tester.tap(find.text('삭제 신청'));
     await tester.pumpAndSettle();
     expect(container.read(sessionProvider), isNotNull);
-    expect(container.read(accountActionsProvider), isFalse);
+    // 수정 일 : 2026-10-31 / 작업자 : 신현진 — 처리 중 여부는 isLoading
+    expect(container.read(accountActionsProvider).isLoading, isFalse);
     expect(find.textContaining('삭제 신청 실패'), findsOneWidget);
   });
 
@@ -540,3 +542,4 @@ void main() {
 }
 // 최종 수정 일 : 2026-10-29 / 작업자 : 최현준
 // 최종 수정 일 : 2026-10-30 / 작업자 : 최현준
+// 최종 수정 일 : 2026-10-31 / 작업자 : 신현진 (동작 Notifier AsyncNotifier 변환에 맞춰 isLoading 사용)

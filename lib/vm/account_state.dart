@@ -34,7 +34,10 @@ final accountProfileProvider =
       Map<String, dynamic>
     >(AccountProfileNotifier.new, retry: (_, _) => null);
 
-final accountActionsProvider = NotifierProvider<AccountActions, bool>(
+// 수정 일 : 2026-10-31 / 작업자 : 신현진
+// 상태관리 방식 변경: Notifier<bool> → AsyncNotifier<void>
+// 처리 중 여부는 state.isLoading (화면은 ref.watch(accountActionsProvider).isLoading)
+final accountActionsProvider = AsyncNotifierProvider<AccountActions, void>(
   AccountActions.new,
 );
 
@@ -60,22 +63,24 @@ final accountRecoveryProvider =
     });
 
 // 저장·삭제 신청을 직렬화합니다. 위젯에서 HTTP나 세션 변경을 복제하지 않습니다.
-class AccountActions extends Notifier<bool> {
+// 수정 일 : 2026-10-31 / 작업자 : 신현진
+// AsyncNotifier<void> : 요청 중 AsyncLoading → 성공 AsyncData / 실패 AsyncError (예외는 화면으로 다시 전달)
+class AccountActions extends AsyncNotifier<void> {
   @override
-  bool build() => false;
+  void build() {}
 
   Future<void> save(Map<String, dynamic> changes) =>
       _submit('/auth/account/profile', changes);
   Future<void> withdraw() => _submit('/auth/account/withdraw', null);
 
   Future<void> _submit(String path, Map<String, dynamic>? changes) async {
-    if (state) throw const ApiException(409, '요청을 처리 중입니다.');
+    if (state.isLoading) throw const ApiException(409, '요청을 처리 중입니다.');
     final before = ref.read(sessionProvider);
     final token = before?['access_token'];
     if (token is! String || token.isEmpty) {
       throw const ApiException(401, '다시 로그인해 주세요.');
     }
-    state = true;
+    state = const AsyncLoading();
     try {
       final result = await ref
           .read(memberApiProvider)
@@ -124,10 +129,13 @@ class AccountActions extends Notifier<bool> {
         }
       }
       ref.invalidate(accountProfileProvider);
-    } finally {
-      if (ref.mounted) state = false;
+      if (ref.mounted) state = const AsyncData(null);
+    } catch (error, stackTrace) {
+      if (ref.mounted) state = AsyncError(error, stackTrace);
+      rethrow;
     }
   }
 }
 // 최종 수정 일 : 2026-10-29 / 작업자 : 최현준
 // 최종 수정 일 : 2026-10-30 / 작업자 : 신현진 (조회 provider AsyncNotifier 변환)
+// 최종 수정 일 : 2026-10-31 / 작업자 : 신현진 (동작 Notifier AsyncNotifier<void> 변환)

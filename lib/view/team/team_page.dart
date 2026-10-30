@@ -386,7 +386,8 @@ class _TeamPageState extends ConsumerState<TeamPage> {
       id: entry.memberId,
       teamId: teamId,
     ));
-    final working = ref.watch(action);
+    // 수정 일 : 2026-10-31 / 작업자 : 신현진 — AsyncNotifier 변환으로 처리 중 여부는 isLoading
+    final working = ref.watch(action).isLoading;
     return ApiContent(
       query: apiQuery('/team/applications/$teamId', {
         'c_id_seq': entry.memberId,
@@ -661,3 +662,4 @@ class _TeamPageState extends ConsumerState<TeamPage> {
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
 // 최종 수정 일 : 2026-10-30 / 작업자 : 김병재 (팀 탭 목업 적용·전 종목 소속팀·선호종목 기준 개설·가입)
 // 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (테마 대비 적용)
+// 최종 수정 일 : 2026-10-31 / 작업자 : 신현진 (동작 Notifier AsyncNotifier 변환에 맞춰 isLoading 사용)
