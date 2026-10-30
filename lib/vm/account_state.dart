@@ -5,8 +5,11 @@ import '../service/member_api.dart';
 import 'member_state.dart';
 
 // 계정별 인증·조회 생명주기는 세션을 구독해 분리하고 화면 종료 시 조회 캐시는 폐기합니다.
-final accountProfileProvider = FutureProvider.autoDispose<Map<String, dynamic>>(
-  (ref) async {
+// 수정 일 : 2026-10-30 / 작업자 : 신현진
+// 상태관리 방식 변경: FutureProvider → AsyncNotifier (조회 로직·autoDispose·retry는 그대로)
+class AccountProfileNotifier extends AsyncNotifier<Map<String, dynamic>> {
+  @override
+  Future<Map<String, dynamic>> build() async {
     final session = ref.watch(sessionProvider);
     final token = session?['access_token'];
     if (token is! String || token.isEmpty) {
@@ -22,9 +25,14 @@ final accountProfileProvider = FutureProvider.autoDispose<Map<String, dynamic>>(
       throw const ApiException(502, '회원정보 응답을 확인할 수 없습니다.');
     }
     return result;
-  },
-  retry: (_, _) => null,
-);
+  }
+}
+
+final accountProfileProvider =
+    AsyncNotifierProvider.autoDispose<
+      AccountProfileNotifier,
+      Map<String, dynamic>
+    >(AccountProfileNotifier.new, retry: (_, _) => null);
 
 final accountActionsProvider = NotifierProvider<AccountActions, bool>(
   AccountActions.new,
@@ -122,3 +130,4 @@ class AccountActions extends Notifier<bool> {
   }
 }
 // 최종 수정 일 : 2026-10-29 / 작업자 : 최현준
+// 최종 수정 일 : 2026-10-30 / 작업자 : 신현진 (조회 provider AsyncNotifier 변환)

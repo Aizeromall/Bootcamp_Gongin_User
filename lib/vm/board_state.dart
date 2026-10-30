@@ -89,50 +89,62 @@ String? boardMemberId(Map<String, dynamic>? session, String sportName) {
   return null;
 }
 
-final boardMatchInfoProvider = FutureProvider.autoDispose
-    .family<Map<String, dynamic>?, int>((ref, seq) async {
-      final session = ref.watch(sessionProvider);
-      final post = await ref.watch(
-        apiDocumentProvider(apiQuery('/board/select/$seq')).future,
+// 수정 일 : 2026-10-30 / 작업자 : 신현진
+// 상태관리 방식 변경: FutureProvider → AsyncNotifier (조회 로직·키·autoDispose·retry는 그대로)
+class BoardMatchInfoNotifier extends AsyncNotifier<Map<String, dynamic>?> {
+  BoardMatchInfoNotifier(this.seq);
+  final int seq;
+
+  @override
+  Future<Map<String, dynamic>?> build() async {
+    final session = ref.watch(sessionProvider);
+    final post = await ref.watch(
+      apiDocumentProvider(apiQuery('/board/select/$seq')).future,
+    );
+    if (!ref.mounted) return null;
+    final reservationId = boardReservationId(post);
+    if (reservationId == null) return null;
+    final reservation = await ref.watch(
+      apiDocumentProvider(apiQuery('/match/reservation/$reservationId')).future,
+    );
+    if (!ref.mounted) return null;
+    final id = boardMemberId(session, '${post['event_category']}');
+    Map<String, dynamic>? data;
+    Map<String, dynamic>? match;
+    final own = id != null && id == post['c_id_seq'];
+    if (id != null) {
+      final response = await ref.watch(
+        apiDocumentProvider(
+          apiQuery(own ? '/team_match/requests/$seq' : '/team_match/posts', {
+            'c_id_seq': id,
+          }),
+        ).future,
       );
-      if (!ref.mounted) return null;
-      final reservationId = boardReservationId(post);
-      if (reservationId == null) return null;
-      final reservation = await ref.watch(
-        apiDocumentProvider(apiQuery('/match/reservation/$reservationId'))
-            .future,
-      );
-      if (!ref.mounted) return null;
-      final id = boardMemberId(session, '${post['event_category']}');
-      Map<String, dynamic>? data;
-      Map<String, dynamic>? match;
-      final own = id != null && id == post['c_id_seq'];
-      if (id != null) {
-        final response = await ref.watch(
-          apiDocumentProvider(
-            apiQuery(own ? '/team_match/requests/$seq' : '/team_match/posts', {
-              'c_id_seq': id,
-            }),
-          ).future,
-        );
-        data = response;
-        if (own) {
-          match = Map<String, dynamic>.from(response['post'] as Map);
-        } else {
-          for (final row in apiRows(response)) {
-            if (row['bulletin_seq'] == seq) match = row;
-          }
+      data = response;
+      if (own) {
+        match = Map<String, dynamic>.from(response['post'] as Map);
+      } else {
+        for (final row in apiRows(response)) {
+          if (row['bulletin_seq'] == seq) match = row;
         }
       }
-      return {
-        'reservation': reservation,
-        'match': match,
-        'member_id': id,
-        'own': own,
-        'can_request': !own && data?['can_request'] == true && match != null,
-        'requests': own ? apiRows(data!) : <Map<String, dynamic>>[],
-      };
-    }, retry: (_, _) => null);
+    }
+    return {
+      'reservation': reservation,
+      'match': match,
+      'member_id': id,
+      'own': own,
+      'can_request': !own && data?['can_request'] == true && match != null,
+      'requests': own ? apiRows(data!) : <Map<String, dynamic>>[],
+    };
+  }
+}
+
+final boardMatchInfoProvider = AsyncNotifierProvider.autoDispose
+    .family<BoardMatchInfoNotifier, Map<String, dynamic>?, int>(
+      BoardMatchInfoNotifier.new,
+      retry: (_, _) => null,
+    );
 
 // 댓글·매칭 변경 시 조회 수가 증가하는 게시글 상세를 다시 호출하지 않습니다.
 void refreshBoardThread(WidgetRef ref, int seq) {
@@ -163,3 +175,4 @@ void refreshBoardThread(WidgetRef ref, int seq) {
   ref.invalidate(boardMatchInfoProvider(seq));
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-30 / 작업자 : 신현진 (조회 provider AsyncNotifier 변환)

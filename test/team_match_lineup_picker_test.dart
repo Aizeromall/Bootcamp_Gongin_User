@@ -10,8 +10,10 @@ void main() {
     List<String>? result;
     final container = ProviderContainer(
       overrides: [
-        teamMatchLineupProvider.overrideWith(
-          (ref, query) async => {
+        // 수정 일 : 2026-10-30 / 작업자 : 신현진
+        // teamMatchLineupProvider가 AsyncNotifier로 바뀌어 build 결과만 바꾸는 overrideWithBuild 사용
+        teamMatchLineupProvider.overrideWithBuild(
+          (ref, notifier) async => {
             'required_count': 2,
             'results': [
               {'c_id_seq': 'a_01', 'c_name': '가'},
@@ -66,3 +68,4 @@ void main() {
   });
 }
 // 최종 수정 일 : 2026-10-30 / 작업자 : 최현준
+// 최종 수정 일 : 2026-10-30 / 작업자 : 신현진 (AsyncNotifier 변환에 맞춰 override 방식 변경)
