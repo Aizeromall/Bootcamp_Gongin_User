@@ -35,6 +35,10 @@ if __package__ in (None, ""):
     # 수정일 2026.10.26
     # 팀 경기 매칭 router (python/FastAPI/team_match 폴더)
     from FastAPI.team_match import team_match_router
+    # 중간 수정 작성자 - 신현진
+    # 수정일 2026.10.29
+    # 회원·팀 등급 점수 조회 router (python/FastAPI/rating 폴더)
+    from FastAPI.rating import rating_router
 else:
     # `python -m FastAPI.main` 모듈 실행에서는 일반 상대 import를 사용합니다.
     from .auth import auth_router
@@ -57,6 +61,10 @@ else:
     # 수정일 2026.10.26
     # 팀 경기 매칭 router (python/FastAPI/team_match 폴더)
     from .team_match import team_match_router
+    # 중간 수정 작성자 - 신현진
+    # 수정일 2026.10.29
+    # 회원·팀 등급 점수 조회 router (python/FastAPI/rating 폴더)
+    from .rating import rating_router
 
 # main.py → FastAPI → python → 프로젝트 루트 순서로 서버 환경 설정을 읽습니다.
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
@@ -125,6 +133,17 @@ app.include_router(ground_router)
 # /team_match 주소는 team_match/__init__.py에서 붙이므로 여기서는 prefix 없이 등록합니다.
 app.include_router(team_match_router)
 
+# 중간 수정 작성자 - 신현진
+# 수정일 2026.10.29
+# 등급 점수 router: 회원·팀 점수와 등급을 /rating 하위 경로로 조회합니다. (조회 전용)
+#   - 내 수준 통계 : /rating/summary/{c_id_seq}  (종목별 회원 ID로 조회)
+#   - 내 점수 변동 : /rating/history/{c_id_seq}
+#   - 팀 점수 변동 : /rating/team/{t_id}
+#   - 등급 구간표   : /rating/tiers  (관리자 앱과 같은 기준)
+# 점수는 관리자 앱의 경기 결과 등록에서만 바뀝니다.
+# /rating 주소는 rating/__init__.py에서 붙이므로 여기서는 prefix 없이 등록합니다.
+app.include_router(rating_router)
+
 
 # 수정 일 : 2026-10-26 / 작업자 : 양태건
 # 게시글·댓글 router를 연결하여 Swagger와 앱에서 /board 경로로 사용합니다.
@@ -169,6 +188,7 @@ if __name__ == "__main__":
     )
 
 # 수정 일 : 2026-10-26 / 수정자 : 신현진 (ground router, team_match router 추가)
+# 수정 일 : 2026-10-29 / 수정자 : 신현진 (rating router 추가)
 # 최종 수정 일 : 2026-10-27 / 작업자 : 양태건
 # 최종 수정 일 : 2026-10-26 / 작업자 : 양태건 (취소 API DELETE CORS 허용)
 # 최종 수정 일 : 2026-10-26 / 작업자 : 김병재 (신고 API 라우터 등록)
