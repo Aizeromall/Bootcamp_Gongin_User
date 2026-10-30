@@ -1,8 +1,6 @@
 // 최초 작업자 : 최현준 / 최초 작업일 : 2026-10-24
 // 수정 일 : 2026-10-27 / 작업자 : 양태건
 // 첨부 홈 목업의 종목 카드·배너·바로가기·필터·목록을 실제 구장 데이터에 적용합니다.
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -10,10 +8,13 @@ import '../../vm/member_state.dart';
 import '../../vm/member_features.dart';
 import '../shared/api_content.dart';
 import '../shared/member_style.dart';
+import '../shared/ground_price.dart';
 import '../shared/ui.dart';
 import 'ground_detail_page.dart';
+import 'rental_availability_page.dart';
 import '../reservation/reservation_page.dart';
 import '../board/board_page.dart';
+import '../home/home_banner.dart';
 
 const _regions = {
   '서울': ['서울', '서울시', '서울특별시'],
@@ -57,6 +58,24 @@ class _GroundsPageState extends ConsumerState<GroundsPage> {
   String searchField = 'g_name';
   String keyword = '';
   bool searchVisible = false;
+  // 수정 일 : 2026-10-30 / 작업자 : 최현준
+  // 홈의 날짜는 목록에서 안내하는 다음 경기 시간의 기준입니다.
+  DateTime selectedDate = DateUtils.dateOnly(DateTime.now());
+  String? get nextSlot {
+    final now = DateTime.now();
+    for (var hour = 8; hour <= 22; hour += 2) {
+      if (DateTime(
+        selectedDate.year,
+        selectedDate.month,
+        selectedDate.day,
+        hour,
+      ).isAfter(now)) {
+        return '${hour.toString().padLeft(2, '0')}:00 ~ ${(hour + 2).toString().padLeft(2, '0')}:00';
+      }
+    }
+    return null;
+  }
+
   final query = apiQuery('/ground');
   void refresh() => ref.invalidate(apiDocumentProvider(query));
   @override
@@ -81,23 +100,6 @@ class _GroundsPageState extends ConsumerState<GroundsPage> {
     return supported.contains(sports[sport]) &&
         (region == '전체 지역' || (_regions[region]?.contains(first) ?? false)) &&
         '${row[searchField] ?? ''}'.toLowerCase().contains(keyword);
-  }
-
-  void browse() {
-    final target = filterKey.currentContext;
-    if (target != null) {
-      Scrollable.ensureVisible(
-        target,
-        duration: const Duration(milliseconds: 300),
-        alignment: 0.05,
-      );
-    } else if (scroll.hasClients) {
-      scroll.animateTo(
-        math.min(360, scroll.position.maxScrollExtent),
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-    }
   }
 
   // 수정 일 : 2026-10-28 / 작업자 : 양태건
@@ -172,7 +174,9 @@ class _GroundsPageState extends ConsumerState<GroundsPage> {
                           child: Material(
                             color: sport == code
                                 ? MemberStyle.greenSurface
-                                : Colors.white,
+                                : Theme.of(context)
+                                      .colorScheme
+                                      .surfaceContainerHigh,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(14),
                               side: BorderSide(
@@ -206,7 +210,9 @@ class _GroundsPageState extends ConsumerState<GroundsPage> {
                                       fontWeight: FontWeight.w800,
                                       color: sport == code
                                           ? MemberStyle.green
-                                          : MemberStyle.ink,
+                                          : Theme.of(context)
+                                                .colorScheme
+                                                .onSurface,
                                     ),
                                   ),
                                 ],
@@ -217,87 +223,24 @@ class _GroundsPageState extends ConsumerState<GroundsPage> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  Material(
-                    color: MemberStyle.navy,
-                    borderRadius: BorderRadius.circular(19),
-                    clipBehavior: Clip.antiAlias,
-                    child: InkWell(
-                      onTap: browse,
-                      child: Stack(
-                        children: [
-                          Positioned.fill(
-                            child: DecoratedBox(
-                              decoration: const BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [MemberStyle.navy, MemberStyle.blue],
-                                ),
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            right: -55,
-                            top: -36,
-                            bottom: -36,
-                            child: Container(
-                              width: 190,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: const Color(0xFF5C93EE)
-                                      .withValues(alpha: 0.32),
-                                  width: 20,
-                                ),
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 18,
-                              vertical: 20,
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '${ref.watch(sessionProvider)?['c_name'] ?? '회원'}님의 ${sports[sport]} 구장 찾기',
-                                  style: const TextStyle(
-                                    color: Color(0xFFCDDCFF),
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                const Text(
-                                  '오늘은 어디서 뛸까요?',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 23,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: -0.6,
-                                  ),
-                                ),
-                                const SizedBox(height: 9),
-                                const Text(
-                                  '구장 살펴보기 →',
-                                  style: TextStyle(
-                                    color: Color(0xFFD4E4FF),
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                  // 수정 일 : 2026-10-30 / 작업자 : 최현준 — 활성 배너만 홈 카드 위치에 표시합니다.
+                  if (!widget.matchOnly) const HomeBanner(),
                   const SizedBox(height: 18),
                   if (!widget.matchOnly)
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _shortcut('🏟️', '구장 예약', browse),
+                        // 수정 일 : 2026-10-30 / 작업자 : 최현준
+                        _shortcut(
+                          '🏟️',
+                          '구장 예약',
+                          () => Navigator.push(
+                            context,
+                            MaterialPageRoute<void>(
+                              builder: (_) => const RentalAvailabilityPage(),
+                            ),
+                          ),
+                        ),
                         _shortcut(
                           '🎯',
                           '실력 매칭',
@@ -320,6 +263,27 @@ class _GroundsPageState extends ConsumerState<GroundsPage> {
                       ],
                     ),
                   const SizedBox(height: 22),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('조회 날짜 · ${day(selectedDate)}'),
+                    subtitle: Text(
+                      nextSlot == null
+                          ? '오늘 남은 경기 시간이 없습니다.'
+                          : '다음 시간 · $nextSlot',
+                    ),
+                    trailing: const Icon(Icons.calendar_month),
+                    onTap: () async {
+                      final chosen = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDate,
+                        firstDate: DateUtils.dateOnly(DateTime.now()),
+                        lastDate: DateTime.now().add(const Duration(days: 365)),
+                      );
+                      if (chosen != null && mounted) {
+                        setState(() => selectedDate = chosen);
+                      }
+                    },
+                  ),
                   Row(
                     key: filterKey,
                     children: [
@@ -333,8 +297,8 @@ class _GroundsPageState extends ConsumerState<GroundsPage> {
                             isDense: true,
                             underline: const SizedBox(),
                             icon: const Icon(Icons.arrow_drop_down, size: 17),
-                            style: const TextStyle(
-                              color: MemberStyle.ink,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
                               fontWeight: FontWeight.w800,
                               fontFamily: 'IBM Plex Sans KR',
                               fontSize: 13,
@@ -372,8 +336,8 @@ class _GroundsPageState extends ConsumerState<GroundsPage> {
                             isDense: true,
                             underline: const SizedBox(),
                             icon: const Icon(Icons.arrow_drop_down, size: 17),
-                            style: const TextStyle(
-                              color: MemberStyle.ink,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
                               fontSize: 13,
                               fontFamily: 'IBM Plex Sans KR',
                             ),
@@ -442,7 +406,9 @@ class _GroundsPageState extends ConsumerState<GroundsPage> {
                           icon: const Icon(Icons.close, size: 18),
                         ),
                         filled: true,
-                        fillColor: MemberStyle.surface,
+                        fillColor: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest,
                         isDense: true,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
@@ -469,16 +435,16 @@ class _GroundsPageState extends ConsumerState<GroundsPage> {
                         horizontal: 16,
                         vertical: 12,
                       ),
-                      color: MemberStyle.surface,
+                      color: Theme.of(context).colorScheme.surfaceContainerHigh,
                       child: Row(
                         children: [
                           Expanded(
                             child: Text(
                               '$region · ${sports[sport]} 구장',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w800,
-                                color: MemberStyle.ink,
+                                color: Theme.of(context).colorScheme.onSurface,
                               ),
                             ),
                           ),
@@ -513,7 +479,7 @@ class _GroundsPageState extends ConsumerState<GroundsPage> {
 
   Widget _shortcut(String emoji, String label, VoidCallback action) => Expanded(
     child: Material(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -526,7 +492,7 @@ class _GroundsPageState extends ConsumerState<GroundsPage> {
                 width: 49,
                 height: 49,
                 decoration: BoxDecoration(
-                  color: MemberStyle.surface,
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(17),
                 ),
                 child: Center(
@@ -536,7 +502,10 @@ class _GroundsPageState extends ConsumerState<GroundsPage> {
               const SizedBox(height: 8),
               Text(
                 label,
-                style: const TextStyle(fontSize: 12, color: MemberStyle.ink),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
               ),
             ],
           ),
@@ -559,10 +528,20 @@ class _GroundsPageState extends ConsumerState<GroundsPage> {
   Widget _groundRow(Map<String, dynamic> row, int sport) => LayoutBuilder(
     builder: (context, constraints) {
       final time = '${row['g_time'] ?? ''}'.trim();
+      final individualPrice = individualGroundPrice(
+        row['g_price'],
+        row['g_num'],
+      );
+      // 플랩의 목록처럼 정보 단위를 카드로 구분하되 실제 구장 데이터만 표시합니다.
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 19),
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: MemberStyle.line)),
+        margin: const EdgeInsets.fromLTRB(16, 5, 16, 7),
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
         child: Row(
           children: [
@@ -579,16 +558,16 @@ class _GroundsPageState extends ConsumerState<GroundsPage> {
                       ),
                       Text(
                         time.split(RegExp(r'[~～–]')).first.trim(),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
-                          color: MemberStyle.ink,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                     ] else
                       const Icon(
                         Icons.stadium_outlined,
-                        color: MemberStyle.muted,
+                        color: MemberStyle.blue,
                         size: 27,
                       ),
                   ],
@@ -602,10 +581,10 @@ class _GroundsPageState extends ConsumerState<GroundsPage> {
                 children: [
                   Text(
                     '${row['g_name'] ?? ''}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
-                      color: MemberStyle.ink,
+                      color: Theme.of(context).colorScheme.onSurface,
                       letterSpacing: -0.35,
                     ),
                   ),
@@ -618,6 +597,15 @@ class _GroundsPageState extends ConsumerState<GroundsPage> {
                     ),
                   ),
                   const SizedBox(height: 7),
+                  // 수정 일 : 2026-10-30 / 작업자 : 최현준
+                  // 선택 날짜의 다음 시간대에 신청한 회원의 평균 티어를 조회합니다.
+                  _GroundAverageTier(
+                    groundCode: '${row['g_code']}',
+                    date: day(selectedDate),
+                    sport: sport,
+                    start: nextSlot?.substring(0, 5),
+                  ),
+                  const SizedBox(height: 7),
                   Wrap(
                     spacing: 4,
                     runSpacing: 4,
@@ -628,14 +616,17 @@ class _GroundsPageState extends ConsumerState<GroundsPage> {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  if (row['g_price'] != null)
-                    Text(
-                      '이용료 ${row['g_price']}원',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: MemberStyle.muted,
-                      ),
+                  // 수정 일 : 2026-10-30 / 작업자 : 최현준
+                  // 실력 매칭 1인 예상 금액과 전체 대여 금액을 혼동하지 않도록 구분합니다.
+                  Text(
+                    individualPrice == null
+                        ? '1인 이용료 확인 불가'
+                        : '1인 이용료 $individualPrice원',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: MemberStyle.muted,
                     ),
+                  ),
                 ],
               ),
             ),
@@ -684,4 +675,54 @@ class _GroundsPageState extends ConsumerState<GroundsPage> {
     ),
   );
 }
+
+class _GroundAverageTier extends ConsumerWidget {
+  const _GroundAverageTier({
+    required this.groundCode,
+    required this.date,
+    required this.sport,
+    required this.start,
+  });
+  final String groundCode;
+  final String date;
+  final int sport;
+  final String? start;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (start == null) return const Text('남은 경기 시간이 없습니다.');
+    final query = apiQuery(
+      '/match/reservation/ground/${Uri.encodeComponent(groundCode)}/ratings',
+      {'r_date': date, 'sport': '$sport'},
+    );
+    return ref
+        .watch(apiDocumentProvider(query))
+        .when(
+          loading: () => const Text('평균 티어 확인 중…'),
+          error: (_, _) => InkWell(
+            onTap: () => ref.invalidate(apiDocumentProvider(query)),
+            child: const Text('평균 티어 조회 실패 · 다시 시도'),
+          ),
+          data: (data) {
+            final slots = data['slots'];
+            if (slots is! List) return const Text('평균 티어 정보 확인 불가');
+            final slot = slots
+                .whereType<Map>()
+                .where((item) => item['rs_time'] == start)
+                .firstOrNull;
+            if (slot == null) return const Text('평균 티어 정보 확인 불가');
+            final count = slot['applicant_count'];
+            if (count == 0) return const Text('신청 인원 없음');
+            final tier = slot['average_tier'];
+            return Text(
+              tier == null ? '평균 티어 정보 확인 불가' : '평균 티어 $tier · 신청 $count명',
+            );
+          },
+        );
+  }
+}
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (홈·구장 테마 대비 적용)
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (구장 목록 카드 스타일 정리)
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준

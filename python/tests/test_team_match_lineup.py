@@ -121,8 +121,10 @@ def test_participant_payment_and_rental_cancel_never_change_data():
     ):
         connection = MagicMock()
         cursor = connection.cursor.return_value.__enter__.return_value
-        cursor.fetchone.side_effect = [{**RENTAL, 'r_seq': 101, 'reservation_category': '2',
-                                       'r_category': '1', 'r_c_category': ''}, {'present': 1}]
+        row = {**RENTAL, 'r_seq': 101, 'reservation_category': '2',
+               'r_category': '1', 'r_c_category': ''}
+        cursor.fetchone.side_effect = ([{'g_code': RENTAL['g_code']}, {'g_code': RENTAL['g_code']}, row, {'present': 1}]
+                                       if module is ground_reservation else [row, {'present': 1}])
         with patch.object(module, 'connect', return_value=connection):
             with unittest.TestCase().assertRaises(HTTPException) as caught:
                 invoke()

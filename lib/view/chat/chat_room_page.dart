@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../vm/chat_state.dart';
 import '../../vm/member_state.dart';
 import '../shared/ui.dart';
+import '../shared/member_style.dart';
 
 // 수정 일 : 2026-10-28 / 작업자 : 양태건
 // 전체 회원 목업의 화면 흐름과 공통 스타일을 적용합니다.
@@ -171,13 +172,17 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                       ? Alignment.centerRight
                       : Alignment.centerLeft,
                   child: Container(
-                    constraints: const BoxConstraints(maxWidth: 320),
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.sizeOf(context).width * .76,
+                    ),
                     margin: const EdgeInsets.only(bottom: 12),
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: mine
-                          ? const Color(0xFF8B4DFF)
-                          : const Color(0xFFF1F3F6),
+                          ? MemberStyle.blue
+                          : Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Column(
@@ -189,24 +194,32 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                             fontWeight: FontWeight.bold,
                             color: mine
                                 ? Colors.white
-                                : const Color(0xFF141A24),
+                                : Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
+                        // 수정 일 : 2026-10-30 / 작업자 : 최현준
+                        // 발신자·본문·시간 사이에 여백을 두어 메시지를 구분합니다.
+                        const SizedBox(height: 4),
                         Text(
                           '${row['s_me_content']}',
                           style: TextStyle(
+                            height: 1.5,
+                            fontSize: 14,
                             color: mine
                                 ? Colors.white
-                                : const Color(0xFF141A24),
+                                : Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
+                        const SizedBox(height: 4),
                         Text(
                           '${row['s_me_date'] ?? ''}',
                           style: Theme.of(context).textTheme.labelSmall
                               ?.copyWith(
                                 color: mine
                                     ? Colors.white70
-                                    : const Color(0xFF757D8E),
+                                    : Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
                               ),
                         ),
                       ],
@@ -256,3 +269,5 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
   }
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (메시지 가독성 개선)
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준

@@ -50,12 +50,12 @@ class _MemberHomeState extends ConsumerState<MemberHome> {
     // 수정 일 : 2026-10-30 / 작업자 : 김병재
     // 종목 Dropdown 제거: 탭 화면들이 가입한 모든 종목 정보를 함께 보여주므로 상단 종목 선택을 없앴습니다.
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         toolbarHeight: tab == 0 ? 76 : 64,
         titleSpacing: 16,
         title: tab == 0
-            ? const FittedBox(
+            ? FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
                 child: Row(
@@ -90,7 +90,7 @@ class _MemberHomeState extends ConsumerState<MemberHome> {
                         style: TextStyle(
                           fontSize: 27,
                           fontWeight: FontWeight.w900,
-                          color: MemberStyle.ink,
+                          color: Theme.of(context).colorScheme.onSurface,
                           letterSpacing: -1,
                         ),
                         children: [
@@ -232,3 +232,4 @@ class _MemberHomeState extends ConsumerState<MemberHome> {
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
 // 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (푸시 연결 상태 및 재시도)
 // 최종 수정 일 : 2026-10-30 / 작업자 : 김병재 (상단 종목 Dropdown 제거)
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (홈 화면 테마 대응)

@@ -2,8 +2,6 @@
 // 최초 작업 일 : 2026-10-24
 import 'package:flutter/material.dart';
 
-import 'member_style.dart';
-
 void showMessage(BuildContext context, Object message) =>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -17,22 +15,33 @@ Widget pageContent(List<Widget> children) => Center(
     child: ListView(padding: const EdgeInsets.all(20), children: children),
   ),
 );
-Widget heading(String title, String subtitle) => Padding(
-  padding: const EdgeInsets.only(bottom: 20),
-  child: Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        title,
-        style: const TextStyle(
-          fontSize: 22,
-          fontWeight: FontWeight.w800,
-          color: MemberStyle.ink,
+Widget heading(String title, String subtitle) => Builder(
+  builder: (context) => Padding(
+    padding: const EdgeInsets.only(bottom: 20),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
         ),
-      ),
-      const SizedBox(height: 8),
-      Text(subtitle, style: const TextStyle(color: MemberStyle.muted)),
-    ],
+        const SizedBox(height: 8),
+        // 수정 일 : 2026-10-30 / 작업자 : 최현준
+        // 보조 설명도 화면 모드에 맞는 대비와 줄 간격을 유지합니다.
+        Text(
+          subtitle,
+          style: TextStyle(
+            fontSize: 14,
+            height: 1.5,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    ),
   ),
 );
 
@@ -84,3 +93,5 @@ class ResultList extends StatelessWidget {
   );
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (제목 테마 대응)
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준

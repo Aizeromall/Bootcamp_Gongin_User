@@ -23,6 +23,16 @@ from .reservation_status import (
 )
 
 from ..notification.events import enqueue_confirmed_slot
+from .payment import PaymentMethod, insert_payment
+
+# ************************
+# 버그 발생 일 : 2026-10-30 / 작업자 : 최현준
+# 1. 위치 : 예약 확정 및 결제 기록 저장
+# 2. 내용 : 예약을 먼저 commit하여 결제 실패 시 미결제 자리가 남음
+# 3. 조치 : 같은 DB 연결에서 예약·결제·성사 알림을 저장하고 한 번만 commit
+# 4. 테스트 : 결제 오류 시 rollback, 정상 시 단일 commit을 Mock으로 검증
+# 5. 보완 : 실제 PG 승인 및 기기·실서버 검증은 별도로 필요
+# ************************
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -97,6 +107,7 @@ def create_reservation(
     g_code: Annotated[str, Body(min_length=1, max_length=45, description="ground 테이블의 구장 코드")],
     r_date: Annotated[date, Body(description="예약 일자")],
     rs_time: Annotated[str, Body(description="예약 시작 시간: 08:00~22:00, 2시간 단위")],
+    p_method: Annotated[PaymentMethod, Body(description="결제 기록에 사용할 결제 수단")],
 ) -> dict:
     """한 사용자와 구장을 연결한 예약을 생성하고 슬롯 마감 여부를 갱신합니다."""
 
@@ -108,11 +119,12 @@ def create_reservation(
 
     sport_name, re_time = sport_from_customer_id(c_id_seq), TIME_SLOTS[rs_time]
     connection = None
+    stage = "구장·회원·슬롯 확인"
     try:
         connection = connect()
         # 구장 row를 잠가 동시 예약이 수용 인원을 넘지 않게 합니다.
         with connection.cursor() as cursor:
-            cursor.execute("SELECT g_code, g_num FROM ground WHERE g_code = %s FOR UPDATE", (g_code,))
+            cursor.execute("SELECT g_code, g_num, g_price FROM ground WHERE g_code = %s FOR UPDATE", (g_code,))
             ground = cursor.fetchone()
             if ground is None:
                 raise HTTPException(status_code=404, detail="존재하지 않는 구장 코드입니다.")
@@ -182,6 +194,7 @@ def create_reservation(
             # r_category는 1(예약)로 저장합니다.
             # 매니저 ID 컬럼이 없으므로 저장하지 않고 배정표로 조회합니다.
             # reservation_category는 1(실력매칭)로 저장합니다.
+            stage = "예약 저장"
             cursor.execute(
                 """INSERT INTO reservation
                     (g_code, c_id_seq, rs_time, re_time, r_date, r_check, reservation_category, r_category, r_c_category)
@@ -192,6 +205,11 @@ def create_reservation(
             r_seq = cursor.lastrowid
             if not isinstance(r_seq, int) or r_seq <= 0:
                 raise RuntimeError("reservation.r_seq 자동 증가값을 가져오지 못했습니다.")
+            # 예약과 결제 기록은 같은 연결에서 저장하며 실패하면 함께 롤백합니다.
+            stage = "결제 기록 저장"
+            payment = insert_payment(cursor, {"r_seq": r_seq, "c_id_seq": c_id_seq,
+                "r_date": r_date, "g_code": g_code, "reservation_category": RESERVATION_MATCH,
+                "g_price": ground["g_price"], "g_num": ground["g_num"]}, p_method)
             is_full = reservation_count + 1 >= ground["g_num"]
             if is_full:
                 # 중간 수정 작성자 - 신현진
@@ -206,12 +224,15 @@ def create_reservation(
                     (True, g_code, r_date, rs_time),
                 )
                 # 정원 충족에 따른 매치 성사와 알림 이벤트를 동일 트랜잭션으로 저장합니다.
+                stage = "매치 성사 알림 저장"
                 enqueue_confirmed_slot(cursor, g_code, r_date, rs_time)
 
         # 중간 수정 작성자 - 신현진
         # 수정일 2026.10.26
         # 응답에 배정 경기매니저 ID·이름을 추가합니다. (배정이 없으면 None)
+        stage = "트랜잭션 확정"
         connection.commit()
+        logger.info("예약·결제 기록 트랜잭션 확정: reservation_id=%s", r_seq)
         return {
             "result": "OK", "r_seq": r_seq, "c_id_seq": c_id_seq, "sport": sport_name,
             "g_code": g_code, "r_date": r_date, "rs_time": rs_time,
@@ -219,20 +240,22 @@ def create_reservation(
             "remaining_capacity": ground["g_num"] - reservation_count - 1,
             "m_id": m_id,
             "m_name": manager["m_name"] if manager else None,
+            "payment": payment,
         }
-    except HTTPException:
+    except HTTPException as error:
         if connection is not None:
             connection.rollback()
+        logger.info("예약·결제 기록 처리 거절: 단계=%s status=%s", stage, error.status_code)
         raise
-    except pymysql.MySQLError:
+    except pymysql.MySQLError as error:
         if connection is not None:
             connection.rollback()
-        logger.exception("구장 예약 DB 처리 실패")
+        logger.error("예약·결제 기록 DB 처리 실패: 단계=%s 오류유형=%s", stage, type(error).__name__)
         raise HTTPException(status_code=500, detail="예약 처리 중 DB 오류가 발생했습니다.")
-    except Exception:
+    except Exception as error:
         if connection is not None:
             connection.rollback()
-        logger.exception("구장 예약 처리 실패")
+        logger.error("예약·결제 기록 처리 실패: 단계=%s 오류유형=%s", stage, type(error).__name__)
         raise HTTPException(status_code=500, detail="예약 처리에 실패했습니다.")
     finally:
         if connection is not None:
@@ -241,3 +264,4 @@ def create_reservation(
 # 최종 수정 일 : 2026-10-26 / 작업자 : 양태건 (실제 배정 요일·시간 연결) / 수정자 : 신현진 (구장 대여 시간대 차단)
 # 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (매치 성사 알림 outbox 연결)
 # 최종 수정 일 : 2026-10-28 / 작업자 : 최현준 (소셜 회원 ID 입력 길이 DB 정합성 적용)
+# 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (예약·결제 원자적 저장)

@@ -113,7 +113,7 @@ class _TeamMatchPostPageState extends ConsumerState<TeamMatchPostPage> {
               final disabled = busy || row['has_post'] == true;
               return MemberPanel(
                 color: selected == row['r_seq']
-                    ? const Color(0xFFEAF1FF)
+                    ? Theme.of(context).colorScheme.primaryContainer
                     : Colors.white,
                 child: ListTile(
                   contentPadding: EdgeInsets.zero,
@@ -159,3 +159,4 @@ class _TeamMatchPostPageState extends ConsumerState<TeamMatchPostPage> {
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
 // 최종 수정 일 : 2026-10-30 / 작업자 : 최현준
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (테마 대비 적용)

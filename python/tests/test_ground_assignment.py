@@ -49,12 +49,12 @@ class GroundAssignmentTests(unittest.TestCase):
                 # 수정일 2026.10.26
                 # 순서: 구장 → 회원 → 배정 매니저 → 중복 예약(None) → 구장 대여 확인(None, version2 추가) → 예약 수
                 cursor.fetchone.side_effect = [
-                    {'g_code': 1, 'g_num': 10}, {'1': 1}, manager,
+                    {'g_code': 1, 'g_num': 10, 'g_price': 10000}, {'1': 1}, manager,
                     None, None, {'reservation_count': 0},
                 ]
                 cursor.lastrowid = 99
                 with patch.object(reservation, 'connect', return_value=connection):
-                    result = reservation.create_reservation('member_01', '1', date(2026, 10, 26), '08:00')
+                    result = reservation.create_reservation('member_01', '1', date(2026, 10, 26), '08:00', '카카오페이')
                 expected = manager['m_id'] if manager else None
                 self.assertEqual(result['m_id'], expected)
                 insert = [call for call in cursor.execute.call_args_list if 'INSERT INTO reservation' in call.args[0]][0]

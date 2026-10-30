@@ -231,7 +231,7 @@ class _TeamPageState extends ConsumerState<TeamPage> {
                       fontWeight: FontWeight.w800,
                       color: entry.team == null
                           ? MemberStyle.blue
-                          : MemberStyle.ink,
+                          : Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -408,7 +408,10 @@ class _TeamPageState extends ConsumerState<TeamPage> {
                   ),
                 ),
                 const Spacer(),
-                const MemberStatusBadge('팀장 전용', color: MemberStyle.ink),
+                MemberStatusBadge(
+                  '팀장 전용',
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
               ],
             ),
             if (waiting.isEmpty)
@@ -657,3 +660,4 @@ class _TeamPageState extends ConsumerState<TeamPage> {
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
 // 최종 수정 일 : 2026-10-30 / 작업자 : 김병재 (팀 탭 목업 적용·전 종목 소속팀·선호종목 기준 개설·가입)
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (테마 대비 적용)

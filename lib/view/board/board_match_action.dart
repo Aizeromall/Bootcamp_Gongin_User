@@ -82,7 +82,7 @@ class _BoardMatchActionState extends ConsumerState<BoardMatchAction> {
         isScrollControlled: true,
         useSafeArea: true,
         showDragHandle: true,
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         constraints: const BoxConstraints(maxWidth: 650),
         builder: (context) => FractionallySizedBox(
           heightFactor: 0.78,
@@ -216,3 +216,4 @@ class _BoardMatchActionState extends ConsumerState<BoardMatchAction> {
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
 // 최종 수정 일 : 2026-10-30 / 작업자 : 최현준
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (테마 대비 적용)

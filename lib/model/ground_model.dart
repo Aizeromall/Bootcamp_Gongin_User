@@ -9,6 +9,8 @@ class Ground {
   final String g_information;     // 이용정보
   final double g_lat;             // 위도
   final double g_lng;             // 경도
+  final String g_time;            // 운영시간
+  final String e_code;            // 종목코드
 
   Ground(
     {
@@ -19,7 +21,9 @@ class Ground {
       required this.g_price,
       required this.g_information,
       required this.g_lat,
-      required this.g_lng
+      required this.g_lng,
+      required this.g_time,
+      required this.e_code
     }
   );
 
@@ -34,7 +38,9 @@ class Ground {
       g_price: json['g_price'] ?? 0,
       g_information: json['g_information'] ?? "__",
       g_lat: (json['g_lat'] as num?)?.toDouble() ?? 0.0,
-      g_lng: (json['g_lng'] as num?)?.toDouble() ?? 0.0
+      g_lng: (json['g_lng'] as num?)?.toDouble() ?? 0.0,
+      g_time: json['g_time'] ?? "__",
+      e_code: json['e_code'] ?? "__",
     );
   }
 
@@ -48,6 +54,8 @@ class Ground {
       'g_information': g_information,
       'g_lat': g_lat,
       'g_lng': g_lng,
+      'g_time': g_time,
+      'e_code': e_code,
     };
   }
 }

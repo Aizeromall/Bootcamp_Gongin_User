@@ -65,7 +65,9 @@ class SanctionPage extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         MemberPanel(
-          color: const Color(0xFFFFF6E7),
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Theme.of(context).colorScheme.surfaceContainerHigh
+              : const Color(0xFFFFF6E7),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -137,3 +139,4 @@ class SanctionPage extends ConsumerWidget {
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
 // 최종 수정 일 : 2026-10-30 / 작업자 : 김병재 (전 종목 제재 내역 표시)
+// 최종 수정 일 : 2026-10-30 / 작업자 : 최현준 (테마 대비 적용)
