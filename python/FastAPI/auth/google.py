@@ -51,7 +51,8 @@ def verified_google_subject(id_token: str) -> str:
     return subjects[0]
 
 
-@router.post("/login", responses=SOCIAL_ERRORS, summary="Google Firebase ID 토큰으로 간편로그인")
+@router.post("/login", responses=SOCIAL_ERRORS, summary="Google Firebase ID 토큰으로 간편로그인",
+             description="앱에서 Google로 로그인해 받은 Firebase ID 토큰을 서버에서 검증하고, 가입된 회원이면 로그인 정보를 반환합니다.")
 def login_google(response: Response,
                  id_token: str = Body(embed=True, min_length=1, max_length=16384,
                                       description="앱의 FirebaseAuth.currentUser.getIdToken() 반환값")) -> dict:

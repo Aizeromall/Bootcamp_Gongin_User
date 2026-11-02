@@ -14,7 +14,7 @@ from datetime import date
 from typing import Optional
 
 import pymysql
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Path, Query
 
 from ..database import connect  # 공용 DB 연결 함수 (python/FastAPI/database.py)
 
@@ -75,8 +75,12 @@ GROUND_SELECT = f"""
 # keyword가 있으면 구장명 또는 주소에 keyword가 들어간 구장만 조회
 # 예: /ground?keyword=강남
 # ground_router 앞에 /ground가 붙으므로 여기 주소는 "" (빈 문자열) → 실제 주소 /ground
-@router.get("")
-def select_grounds(keyword: Optional[str] = None):
+@router.get(
+    "", summary="구장 목록 조회",
+    description="구장 목록을 조회합니다. 검색어를 지정하면 구장명·주소가 일치하는 구장만 반환합니다.",
+    responses={500: {"description": "구장 조회 실패"}},
+)
+def select_grounds(keyword: Optional[str] = Query(None, description="구장명 또는 주소 검색어")):
     connection = None
     try:
         connection = connect()  # DB 연결
@@ -114,8 +118,12 @@ def select_grounds(keyword: Optional[str] = None):
 # 주의: 목록("") 보다 아래에 있어야 하며, 주소의 g_code로 구장 1곳만 조회
 # 실제 주소 /ground/{g_code}
 # (구장 대여 /ground/reservation/... 주소는 ground/__init__.py에서 이 라우터보다 먼저 등록해서 겹치지 않게 함)
-@router.get("/{g_code}")
-def select_ground(g_code: str):
+@router.get(
+    "/{g_code}", summary="구장 상세 조회",
+    description="구장 코드로 구장 한 곳의 상세 정보를 조회합니다.",
+    responses={404: {"description": "존재하지 않는 구장 코드"}, 500: {"description": "구장 조회 실패"}},
+)
+def select_ground(g_code: str = Path(..., description="구장 코드")):
     connection = None
     try:
         connection = connect()

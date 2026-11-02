@@ -53,12 +53,16 @@ def team_to_dict(row: dict) -> dict:
 
 
 # 팀 목록: 팀명 검색·페이지 처리를 지원하며 기본적으로 폐지된 팀은 제외합니다.
-@router.get("/select", summary="팀 목록 조회")
+@router.get(
+    "/select", summary="팀 목록 조회",
+    description="팀 목록을 조회합니다. 팀명 검색과 폐지된 팀 포함 여부를 지정할 수 있습니다.",
+    responses={500: {"description": "팀 조회 실패"}},
+)
 def select_teams(
     keyword: Optional[str] = Query(default=None, max_length=50, description="팀명 검색"),
     include_closed: bool = Query(default=False, description="폐지된 팀도 포함할지 여부"),
-    limit: int = Query(default=20, ge=1, le=100),
-    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100, description="한 번에 가져올 건수"),
+    offset: int = Query(default=0, ge=0, description="건너뛸 건수"),
 ):
     conditions = []
     params = []
@@ -98,7 +102,11 @@ def select_teams(
 
 
 # 팀 상세: 팀 정보·팀원 수·팀장 및 개설/폐지 상태를 확인합니다. 조회 수 등의 쓰기는 없습니다.
-@router.get("/select/{t_id}", summary="팀 상세 조회")
+@router.get(
+    "/select/{t_id}", summary="팀 상세 조회",
+    description="팀 한 곳의 상세 정보를 조회합니다.",
+    responses={404: {"description": "존재하지 않는 팀"}, 500: {"description": "팀 조회 실패"}},
+)
 def select_team(t_id: int = Path(gt=0, description="조회할 팀 ID")):
     connection = None
     try:

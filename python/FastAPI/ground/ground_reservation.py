@@ -26,7 +26,7 @@ from datetime import date
 from typing import Annotated
 
 import pymysql
-from fastapi import APIRouter, Body, HTTPException, Query, status
+from fastapi import APIRouter, Body, HTTPException, Path, Query, status
 
 from ..database import connect  # 공용 DB 연결 함수 (python/FastAPI/database.py)
 # 실력매칭 예약과 같은 기준을 쓰기 위해 match 폴더의 공용 값·함수를 가져옴
@@ -112,8 +112,15 @@ GROUND_RESERVATION_SELECT = f"""
 #   1) 다른 회원이 이미 대여했는지 (reservation_category = 2)
 #   2) 실력매칭 예약이 1명이라도 있는지 (reservation_category = 1)
 # 예: /ground/reservation/slots/1?r_date=2026-10-30
-@router.get("/reservation/slots/{g_code}")
-def select_ground_reservation_slots(g_code: str, r_date: date):
+@router.get(
+    "/reservation/slots/{g_code}", summary="구장 대여 가능 시간대 조회",
+    description="구장과 날짜를 지정해 시간대별 대여 가능 여부를 조회합니다.",
+    responses={404: {"description": "존재하지 않는 구장 코드"}, 500: {"description": "대여 시간대 조회 실패"}},
+)
+def select_ground_reservation_slots(
+    g_code: str = Path(..., description="구장 코드"),
+    r_date: date = Query(..., description="조회할 날짜 (예: 2026-10-30)"),
+):
     connection = None
     try:
         connection = connect()  # DB 연결
@@ -181,6 +188,8 @@ def select_ground_reservation_slots(g_code: str, r_date: date):
 @router.post(
     "/reservation",
     status_code=status.HTTP_201_CREATED,
+    summary="구장 대여 신청",
+    description="회원이 구장을 2시간 단위로 대여하고 결제 기록을 함께 생성합니다.",
     responses={
         400: {"description": "c_id_seq / 시작 시간 형식 오류 또는 지난 날짜"},
         404: {"description": "회원 또는 구장 코드가 존재하지 않음"},
@@ -298,9 +307,13 @@ def create_ground_reservation(
 # r_category를 안 보내면 1(예약)로 조회
 # 예: /ground/reservation/customer/hong_01                대여 내역
 #     /ground/reservation/customer/hong_01?r_category=2   취소 내역
-@router.get("/reservation/customer/{c_id_seq}")
+@router.get(
+    "/reservation/customer/{c_id_seq}", summary="회원의 구장 대여 내역 조회",
+    description="회원이 대여한 구장 내역을 조회합니다. 대여 내역과 취소 내역 중 하나를 선택합니다.",
+    responses={500: {"description": "대여 내역 조회 실패"}},
+)
 def select_ground_reservations_by_customer(
-    c_id_seq: str,
+    c_id_seq: str = Path(..., description="회원 아이디(customer PK)"),
     # ge=1, le=2 : 1~2 밖의 값이 오면 FastAPI가 자동으로 422 에러 처리
     r_category: int = Query(CATEGORY_RESERVED, ge=1, le=2, description="1 대여 내역 / 2 취소 내역"),
 ):
@@ -331,8 +344,12 @@ def select_ground_reservations_by_customer(
 # 대여 1건 상세 조회 (예약/취소 상관없이 조회, 실력매칭 예약번호면 404)
 # 주의: "/reservation/slots/..", "/reservation/customer/.." 보다 아래에 있어야
 #       "slots", "customer"가 r_seq로 잘못 인식되지 않음
-@router.get("/reservation/{r_seq}")
-def select_ground_reservation(r_seq: int):
+@router.get(
+    "/reservation/{r_seq}", summary="구장 대여 상세 조회",
+    description="예약 번호로 구장 대여 한 건의 상세 정보를 조회합니다.",
+    responses={404: {"description": "존재하지 않는 예약 번호"}, 500: {"description": "대여 상세 조회 실패"}},
+)
+def select_ground_reservation(r_seq: int = Path(..., description="예약 번호")):
     connection = None
     try:
         connection = connect()
@@ -374,9 +391,19 @@ def select_ground_reservation(r_seq: int):
 # 팀장이 바뀌어 대여가 새 팀장에게 넘어간 경우에도 결제(pay.c_id_seq)는 실제로 결제한 회원 그대로라
 # 환불 대상은 응답의 refund_c_id_seq(결제한 회원)로 안내
 # 예: DELETE /ground/reservation/15?c_id_seq=hong_01&r_c_category=팀매칭 성사 안 됨
-@router.delete("/reservation/{r_seq}")
+@router.delete(
+    "/reservation/{r_seq}", summary="구장 대여 취소",
+    description="구장을 대여한 팀장이 본인의 대여를 취소합니다.",
+    responses={
+        403: {"description": "본인 예약이 아님"},
+        404: {"description": "존재하지 않는 예약 번호 또는 구장 코드"},
+        409: {"description": "이미 취소됐거나 취소할 수 없는 시점"},
+        422: {"description": "취소 사유 누락 또는 숫자만 입력"},
+        500: {"description": "대여 취소 중 DB 오류"},
+    },
+)
 def cancel_ground_reservation(
-    r_seq: int,
+    r_seq: int = Path(..., description="취소할 예약 번호"),
     r_c_category: str = Query(min_length=1, max_length=50, description="팀장이 작성한 취소 사유 (기타, 최대 50자)"),
     c_id_seq: str = Query(min_length=4, max_length=50, description="취소를 요청한 회원 (본인 확인용)"),
 ):

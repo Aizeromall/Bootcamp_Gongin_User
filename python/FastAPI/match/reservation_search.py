@@ -21,7 +21,7 @@ from datetime import date, timedelta
 # 중간 수정 작성자 - 신현진
 # 수정일 2026.10.26
 import pymysql
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Path, Query
 
 from ..database import connect  # 공용 DB 연결 함수 (python/FastAPI/database.py)
 # 예약 구분(reservation_category) 1 실력매칭 / 2 구장대여 조건을 함께 사용 (2026.10.26 신현진)
@@ -121,9 +121,13 @@ RESERVATION_SELECT = f"""
 # r_category를 안 보내면 1(예약)로 조회 → 기존 앱 화면(내역 > 예약)은 그대로 동작
 # 예: /match/reservation/customer/hong_01                 예약 내역
 #     /match/reservation/customer/hong_01?r_category=2    취소 내역
-@router.get("/reservation/customer/{c_id_seq}")
+@router.get(
+    "/reservation/customer/{c_id_seq}", summary="회원의 예약 내역 조회",
+    description="회원이 예약한 경기 내역을 조회합니다. 예약 내역과 취소 내역 중 하나를 선택합니다.",
+    responses={500: {"description": "예약 내역 조회 실패"}},
+)
 def select_reservations_by_customer(
-    c_id_seq: str,
+    c_id_seq: str = Path(..., description="회원 아이디(customer PK)"),
     # ge=1, le=2 : 1~2 밖의 값이 오면 FastAPI가 자동으로 422 에러 처리
     r_category: int = Query(CATEGORY_RESERVED, ge=1, le=2, description="1 예약 내역 / 2 취소 내역"),
 ):
@@ -158,8 +162,15 @@ def select_reservations_by_customer(
 # 구장의 날짜별 시간대 예약 현황 조회 (예약 화면에서 시간 선택용)
 # 시간대마다 예약 수를 세서 ground.g_num(수용인원)과 비교해 남은 자리를 계산
 # 예: /match/reservation/ground/G001?r_date=2026-10-25
-@router.get("/reservation/ground/{g_code}")
-def select_reservation_status(g_code: str, r_date: date):
+@router.get(
+    "/reservation/ground/{g_code}", summary="구장 날짜별 예약 현황 조회",
+    description="구장과 날짜를 지정해 시간대별 예약 현황을 조회합니다.",
+    responses={404: {"description": "존재하지 않는 구장 코드"}, 500: {"description": "예약 현황 조회 실패"}},
+)
+def select_reservation_status(
+    g_code: str = Path(..., description="구장 코드"),
+    r_date: date = Query(..., description="조회할 날짜 (예: 2026-10-30)"),
+):
     connection = None
     try:
         connection = connect()
@@ -241,10 +252,15 @@ def select_reservation_status(g_code: str, r_date: date):
 # 취소되지 않은 실력매칭 신청자의 종목별 현재 점수만 집계합니다.
 # 개인 식별자는 반환하지 않으며 중복 예약 행도 회원별 한 번만 계산합니다.
 @router.get("/reservation/ground/{g_code}/ratings", summary="구장·종목별 시간대 신청자 평균 티어",
+            description="구장, 날짜, 종목을 지정해 시간대별 신청자의 평균 점수와 티어를 조회합니다.",
             responses={404: {"description": "구장을 찾을 수 없음"},
                        422: {"description": "날짜 또는 종목 코드 오류"},
                        500: {"description": "평균 점수 조회 오류"}})
-def select_ground_slot_ratings(g_code: str, r_date: date, sport: int = Query(..., ge=1, le=4)):
+def select_ground_slot_ratings(
+    g_code: str = Path(..., description="구장 코드"),
+    r_date: date = Query(..., description="조회할 날짜 (예: 2026-10-30)"),
+    sport: int = Query(..., ge=1, le=4, description="종목 번호(1~4)"),
+):
     connection = None
     try:
         connection = connect()
@@ -289,8 +305,12 @@ def select_ground_slot_ratings(g_code: str, r_date: date, sport: int = Query(...
 # 예약 1건 상세 조회
 # 주의: "/reservation/customer/..", "/reservation/ground/.." 보다 아래에 있어야
 #       "customer", "ground"가 r_seq로 잘못 인식되지 않음
-@router.get("/reservation/{r_seq}")
-def select_reservation(r_seq: int):
+@router.get(
+    "/reservation/{r_seq}", summary="예약 상세 조회",
+    description="예약 번호로 예약 한 건의 상세 정보를 조회합니다.",
+    responses={404: {"description": "존재하지 않는 예약 번호"}, 500: {"description": "예약 상세 조회 실패"}},
+)
+def select_reservation(r_seq: int = Path(..., description="예약 번호")):
     connection = None
     try:
         connection = connect()

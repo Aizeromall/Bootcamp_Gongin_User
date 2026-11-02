@@ -54,7 +54,8 @@ def decode_expired_token(encoded: str) -> dict:
 # 수정 일 : 2026-10-30 / 작업자 : 김병재
 # 토큰 갱신: DB에서 현재 활성 종목을 다시 확인한 뒤 로그인 응답과 같은 형식으로 새 JWT를 반환합니다.
 # 삭제 신청·탈퇴한 종목은 새 토큰의 member_ids에서 빠지며, 활성 종목이 없으면 403입니다.
-@router.post("/refresh", responses=REFRESH_ERRORS, summary="로그인 토큰 갱신 (만료 후 30일까지)")
+@router.post("/refresh", responses=REFRESH_ERRORS, summary="로그인 토큰 갱신 (만료 후 30일까지)",
+             description="만료된 로그인 토큰도 만료 후 30일까지는 새 토큰으로 갱신합니다. 현재 활성 종목을 다시 확인하며 활성 종목이 없으면 거절합니다.")
 def refresh_token(credentials: HTTPAuthorizationCredentials | None = Depends(security)) -> dict:
     if credentials is None:
         raise HTTPException(status_code=401, detail="일반 로그인 Bearer 토큰이 필요합니다.",

@@ -10,8 +10,9 @@ from .device import device_connection, ERRORS
 router = APIRouter()
 
 
-@router.get("/events", responses=ERRORS, summary="본인 알림 이벤트·FCM 접수 상태 조회")
-def select_events(limit: int = Query(default=50, ge=1, le=100), account: dict = Depends(current_account)) -> dict:
+@router.get("/events", responses=ERRORS, summary="본인 알림 이벤트·FCM 접수 상태 조회",
+            description="로그인한 회원의 알림 이벤트와 FCM 접수 상태를 최신순으로 조회합니다.")
+def select_events(limit: int = Query(default=50, ge=1, le=100, description="한 번에 가져올 건수"), account: dict = Depends(current_account)) -> dict:
     placeholders = ",".join(["%s"] * len(account["member_ids"]))
     with device_connection() as connection:
         with connection.cursor() as cursor:

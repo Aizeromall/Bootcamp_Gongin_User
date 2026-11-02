@@ -96,6 +96,7 @@ def hash_password(plain_password: str) -> str:
 @router.post(
     "/register",
     status_code=status.HTTP_201_CREATED,
+    summary="일반 회원가입",
     responses={
         status.HTTP_409_CONFLICT: {"description": "중복 아이디 또는 DB 제약 조건 위반"},
         status.HTTP_422_UNPROCESSABLE_CONTENT: {"description": "필수값 또는 선호 종목 검증 실패"},

@@ -76,8 +76,12 @@ def order_comments(rows: list[dict] | tuple[dict, ...]) -> list[dict]:
 
 
 # 6. 댓글 조회: 일반 댓글부터 모든 깊이의 대댓글을 조회합니다.
-@router.get("/comment/select/{bulletin_seq}", summary="댓글·대댓글 조회")
-def select_comments(bulletin_seq: int = Path(gt=0)):
+@router.get(
+    "/comment/select/{bulletin_seq}", summary="댓글·대댓글 조회",
+    description="게시글에 달린 댓글과 대댓글을 조회합니다.",
+    responses={404: {"description": "존재하지 않는 게시글"}, 409: {"description": "연결된 게시글 또는 댓글 정보 오류"}, 500: {"description": "게시판 처리 중 서버 오류"}},
+)
+def select_comments(bulletin_seq: int = Path(gt=0, description="게시글 번호")):
     # 수정 일 : 2026-10-26 / 작업자 : 양태건
     # 이 기능에서 직접 연결하고, 실패 시 롤백한 뒤 연결을 해제합니다.
     connection = None
@@ -115,7 +119,16 @@ def select_comments(bulletin_seq: int = Path(gt=0)):
 
 # 7. 댓글·대댓글 작성: 부모가 같은 게시글에 있는지 확인하고 depth를 서버에서 계산합니다.
 # 삭제된 부모 댓글에도 답변할 수 있으므로 기존 대화 연결은 계속 유지됩니다.
-@router.post("/comment/insert/{bulletin_seq}", status_code=status.HTTP_201_CREATED, summary="댓글·대댓글 작성")
+@router.post(
+    "/comment/insert/{bulletin_seq}", status_code=status.HTTP_201_CREATED, summary="댓글·대댓글 작성",
+    description="게시글에 댓글을 작성하거나 기존 댓글에 대댓글을 작성합니다. 매칭이 성사된 게시글에는 댓글을 작성할 수 없습니다.",
+    responses={
+        404: {"description": "존재하지 않는 게시글, 회원 또는 부모 댓글"},
+        409: {"description": "매칭 성사 게시글이거나 댓글 연결·깊이 정보 오류"},
+        422: {"description": "사용할 수 없는 문구 포함 또는 요청 값 검증 실패"},
+        500: {"description": "게시판 처리 중 서버 오류"},
+    },
+)
 # 수정 일 : 2026-10-26 / 작업자 : 양태건
 # Swagger의 기본 예시는 부모가 필요 없는 일반 댓글이며, 대댓글 예시는 따로 선택합니다.
 def insert_comment(
@@ -130,7 +143,7 @@ def insert_comment(
                       "reply_to_comment_seq": 1},
         },
     }),
-    bulletin_seq: int = Path(gt=0),
+    bulletin_seq: int = Path(gt=0, description="게시글 번호"),
 ):
     if '[출전예약:' in payload.comment_content or '[출전정보:' in payload.comment_content:
         raise HTTPException(status_code=422, detail='댓글에 사용할 수 없는 문구입니다.')
@@ -223,10 +236,20 @@ class UpdateCommentRequest(BoardTextRequest):
     comment_content: str = Field(min_length=1, max_length=5000)
 
 
-@router.put("/comment/update/{comment_seq}", summary="본인 댓글 수정")
+@router.put(
+    "/comment/update/{comment_seq}", summary="본인 댓글 수정",
+    description="회원이 본인이 작성한 댓글을 수정합니다. 출전 예약이 연결된 신청과 삭제된 댓글은 수정할 수 없습니다.",
+    responses={
+        403: {"description": "본인 댓글이 아님"},
+        404: {"description": "존재하지 않는 회원 또는 댓글"},
+        409: {"description": "출전 예약이 연결된 신청, 삭제된 댓글 또는 연결 정보 오류"},
+        422: {"description": "사용할 수 없는 문구 포함 또는 요청 값 검증 실패"},
+        500: {"description": "게시판 처리 중 서버 오류"},
+    },
+)
 def update_comment(
     payload: UpdateCommentRequest,
-    comment_seq: int = Path(gt=0),
+    comment_seq: int = Path(gt=0, description="수정할 댓글 번호"),
     bulletin_seq: int = Query(gt=0, description="댓글이 속한 게시글 번호 (복합 PK)"),
 ):
     if '[출전예약:' in payload.comment_content or '[출전정보:' in payload.comment_content:
@@ -282,11 +305,20 @@ def update_comment(
 # 수정 일 : 2026-10-26 / 작업자 : 양태건
 # 댓글 삭제 기능을 delete.py에서 옮겨 댓글 관련 처리를 이 파일에 모읍니다.
 # 8. 댓글 삭제: 작성자만 삭제 표시할 수 있으며 자식 댓글과 부모 번호는 보존합니다.
-@router.delete("/comment/delete/{comment_seq}", summary="본인 댓글 삭제")
+@router.delete(
+    "/comment/delete/{comment_seq}", summary="본인 댓글 삭제",
+    description="회원이 본인이 작성한 댓글을 삭제합니다. 출전 예약이 연결된 신청과 이미 삭제된 댓글은 삭제할 수 없습니다.",
+    responses={
+        403: {"description": "본인 댓글이 아님"},
+        404: {"description": "존재하지 않는 회원 또는 댓글"},
+        409: {"description": "출전 예약이 연결된 신청, 이미 삭제된 댓글 또는 연결 정보 오류"},
+        500: {"description": "게시판 처리 중 서버 오류"},
+    },
+)
 def delete_comment(
-    comment_seq: int = Path(gt=0),
+    comment_seq: int = Path(gt=0, description="삭제할 댓글 번호"),
     bulletin_seq: int = Query(gt=0, description="댓글이 속한 게시글 번호 (복합 PK)"),
-    c_id_seq: str = Query(min_length=1, max_length=50),
+    c_id_seq: str = Query(min_length=1, max_length=50, description="삭제를 요청한 회원 아이디(본인 확인용)"),
 ):
     c_id_seq = c_id_seq.strip()
     # 수정 일 : 2026-10-26 / 작업자 : 양태건

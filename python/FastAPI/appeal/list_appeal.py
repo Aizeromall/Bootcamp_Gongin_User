@@ -80,6 +80,8 @@ def appeal_to_dict(row: dict, sanctions: dict) -> dict:
 # 내 이의신청 내역 조회: 회원 아이디(c_id_seq)로 신청한 이의신청을 최신순으로 조회
 @router.get(
     "",
+    summary="내 이의신청 내역 조회",
+    description="회원 아이디로 해당 회원이 접수한 이의신청 내역을 조회합니다.",
     responses={
         status.HTTP_404_NOT_FOUND: {"description": "존재하지 않는 회원 아이디"},
         status.HTTP_422_UNPROCESSABLE_CONTENT: {"description": "요청 값 검증 실패"},

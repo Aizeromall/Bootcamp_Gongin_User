@@ -68,7 +68,8 @@ def team_summary(row: dict, member_id: str) -> dict:
 # 수정 일 : 2026-10-30 / 작업자 : 김병재
 # 내 소속팀 조회: 종목마다 소속팀(team, 없으면 null)과 승인 대기 중인 신청 팀(pending)을 함께 반환합니다.
 # 회원 ID는 요청값이 아니라 서명된 JWT의 member_ids만 사용하므로 다른 회원의 소속은 조회할 수 없습니다.
-@router.get("", summary="내 종목별 소속팀 조회", responses={
+@router.get("", summary="내 종목별 소속팀 조회",
+            description="로그인한 회원의 종목별 소속팀 정보를 조회합니다.", responses={
     401: {"description": "로그인 JWT 누락·위조·만료"},
     500: {"description": "DB 조회 실패"},
     503: {"description": "AUTH_TOKEN_SECRET 미설정"},

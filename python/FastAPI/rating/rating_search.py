@@ -27,7 +27,7 @@ import logging
 import re
 
 import pymysql
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Path, Query
 
 from ..database import connect  # 공용 DB 연결 함수 (python/FastAPI/database.py)
 
@@ -109,7 +109,10 @@ def find_customer(cursor, c_id_seq: str) -> dict:
 
 # 등급 구간표 (앱의 등급 안내·다음 등급 표시용)
 # 낮은 등급부터 순서대로 [{tier, min_rating, max_rating}] (프로는 max_rating = None)
-@router.get("/tiers")
+@router.get(
+    "/tiers", summary="레이팅 티어 기준 조회",
+    description="레이팅 점수에 따른 티어 구간 기준표를 조회합니다.",
+)
 def select_rating_tiers():
     ordered = [(RATING_FLOOR, TIER_LOWEST)] + list(reversed(TIERS))
     tiers = []
@@ -122,9 +125,13 @@ def select_rating_tiers():
 # 내 수준 통계 (점수·등급 카드)
 # 현재 점수는 customer.c_rating, 통계는 전·후 점수가 모두 있는 경기만 사용
 # 예: /rating/summary/hong_01?recent=5
-@router.get("/summary/{c_id_seq}")
+@router.get(
+    "/summary/{c_id_seq}", summary="회원 레이팅 요약 조회",
+    description="회원의 현재 레이팅과 티어, 최근 경기들의 점수 변동 합계를 조회합니다.",
+    responses={500: {"description": "레이팅 조회 실패"}},
+)
 def select_rating_summary(
-    c_id_seq: str,
+    c_id_seq: str = Path(..., description="회원 아이디(종목별 customer PK)"),
     recent: int = Query(5, ge=1, le=50, description="최근 몇 경기의 점수 변동을 합칠지"),
 ):
     sport_name = sport_from_customer_id(c_id_seq)  # 종목 확인 (형식이 틀리면 400)
@@ -194,9 +201,13 @@ def select_rating_summary(
 # 항목마다 경기 전 내 점수 → 경기 후 내 점수와 변동(±)을 보냄 (점수가 비어 있던 경기는 기존 점수, 변동 0)
 # 점수 추이 그래프는 rating_after를 날짜 오름차순으로 이어서 그림
 # 예: /rating/history/hong_01?limit=30
-@router.get("/history/{c_id_seq}")
+@router.get(
+    "/history/{c_id_seq}", summary="회원 레이팅 변동 내역 조회",
+    description="회원의 경기별 레이팅 변동 내역을 최신순으로 조회합니다.",
+    responses={500: {"description": "레이팅 변동 내역 조회 실패"}},
+)
 def select_rating_history(
-    c_id_seq: str,
+    c_id_seq: str = Path(..., description="회원 아이디(종목별 customer PK)"),
     limit: int = Query(30, ge=1, le=200, description="최근 몇 경기까지 조회할지"),
 ):
     sport_name = sport_from_customer_id(c_id_seq)
@@ -264,9 +275,13 @@ def select_rating_history(
 #   - 팀의 첫 경기 기록 : 시작 점수(1500)와의 차이
 #   - 점수가 비어 있는 경기(컬럼 추가 전 등록) : 직전 점수를 그대로 보여 주고 변동 0
 # 예: /rating/team/3?limit=30
-@router.get("/team/{t_id}")
+@router.get(
+    "/team/{t_id}", summary="팀 레이팅 변동 내역 조회",
+    description="팀의 경기별 레이팅 변동 내역을 최신순으로 조회합니다.",
+    responses={404: {"description": "존재하지 않는 팀"}, 500: {"description": "팀 레이팅 조회 실패"}},
+)
 def select_team_rating_history(
-    t_id: int,
+    t_id: int = Path(..., description="팀 ID"),
     limit: int = Query(30, ge=1, le=200, description="최근 몇 경기까지 조회할지"),
 ):
     connection = None

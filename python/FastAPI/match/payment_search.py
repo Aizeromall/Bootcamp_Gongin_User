@@ -9,7 +9,7 @@
 import logging
 
 import pymysql
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Path
 
 from ..database import connect  # 공용 DB 연결 함수 (python/FastAPI/database.py)
 from .reservation_search import RESERVATION_MANAGER_JOIN, format_time  # 시간 값 → "08:00" 형식으로 통일
@@ -63,8 +63,12 @@ RESERVATION_JOIN = f"""
 
 # 회원별 결제 내역 조회
 # 예: /match/payment/customer/hong_01
-@router.get("/payment/customer/{c_id_seq}")
-def select_payments_by_customer(c_id_seq: str):
+@router.get(
+    "/payment/customer/{c_id_seq}", summary="회원의 결제 내역 조회",
+    description="회원 아이디로 해당 회원의 결제 내역을 조회합니다.",
+    responses={500: {"description": "결제 내역 조회 실패"}},
+)
+def select_payments_by_customer(c_id_seq: str = Path(..., description="회원 아이디(customer PK)")):
     connection = None
     try:
         connection = connect()  # DB 연결
@@ -92,8 +96,12 @@ def select_payments_by_customer(c_id_seq: str):
 # 예약당 결제는 1번만 가능하므로(payment.py에서 막음) 결과는 0건 또는 1건
 # 결제 전이면 404 → 앱에서 "결제하기" 버튼을 보여주는 용도로 사용
 # 예: /match/payment/reservation/15
-@router.get("/payment/reservation/{r_seq}")
-def select_payment_by_reservation(r_seq: int):
+@router.get(
+    "/payment/reservation/{r_seq}", summary="예약의 결제 내역 조회",
+    description="예약 번호로 해당 예약의 결제 내역을 조회합니다.",
+    responses={404: {"description": "존재하지 않는 예약 번호 또는 결제 내역 없음"}, 500: {"description": "결제 내역 조회 실패"}},
+)
+def select_payment_by_reservation(r_seq: int = Path(..., description="예약 번호")):
     connection = None
     try:
         connection = connect()
@@ -120,8 +128,12 @@ def select_payment_by_reservation(r_seq: int):
 # 결제 1건 상세 조회
 # 주의: "/payment/customer/..", "/payment/reservation/.." 보다 아래에 있어야
 #       "customer", "reservation"이 p_seq로 잘못 인식되지 않음
-@router.get("/payment/{p_seq}")
-def select_payment(p_seq: int):
+@router.get(
+    "/payment/{p_seq}", summary="결제 상세 조회",
+    description="결제 번호로 결제 한 건의 상세 정보를 조회합니다.",
+    responses={404: {"description": "존재하지 않는 결제 번호"}, 500: {"description": "결제 상세 조회 실패"}},
+)
+def select_payment(p_seq: int = Path(..., description="결제 번호")):
     connection = None
     try:
         connection = connect()

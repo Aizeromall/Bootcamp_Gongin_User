@@ -18,12 +18,14 @@ router = APIRouter()
 
 # 수정 일 : 2026-10-28 / 작업자 : 최현준
 # 간편가입자는 비밀번호가 없으므로 서비스 JWT의 소유 종목만 채팅 토큰으로 교환합니다.
-@router.post("/session-token", summary="로그인한 본인의 종목별 채팅 인증", responses={
+@router.post("/session-token", summary="로그인한 본인의 종목별 채팅 인증",
+             description="서비스 로그인 토큰으로 본인 종목의 회원 아이디를 확인하고 채팅용 토큰을 발급합니다.", responses={
     401: {"description": "서비스 JWT 누락·만료"}, 403: {"description": "타인 회원 ID"},
     404: {"description": "탈퇴·없는 회원"}, 422: {"description": "회원 ID 형식 오류"},
     500: {"description": "DB 오류"}, 503: {"description": "JWT 설정 오류"},
 })
-def chat_session_token(c_id_seq: str = Body(embed=True, min_length=1, max_length=50),
+def chat_session_token(c_id_seq: str = Body(embed=True, min_length=1, max_length=50,
+                                            description="채팅에 사용할 회원 아이디(종목별, 본인 소유만 가능)"),
                        account: dict = Depends(current_account)):
     if c_id_seq not in account["member_ids"]:
         raise HTTPException(status_code=403, detail="본인 종목의 채팅만 연결할 수 있습니다.")
@@ -44,7 +46,9 @@ class ChatLoginRequest(ChatRequest):
     c_pw: SecretStr = Field(min_length=8, max_length=128)
 
 # 기존 비밀번호 검증 후 채팅 전용 토큰을 발급합니다.
-@router.post("/token", summary="채팅 로그인 토큰 발급")
+@router.post("/token", summary="채팅 로그인 토큰 발급",
+             description="회원 아이디와 비밀번호를 확인해 채팅용 토큰을 발급합니다.",
+             responses={401: {"description": "아이디 또는 비밀번호 불일치"}})
 def chat_login(payload: ChatLoginRequest):
     with chat_connection() as connection:
         with connection.cursor() as cursor:

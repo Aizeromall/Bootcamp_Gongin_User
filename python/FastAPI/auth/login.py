@@ -51,6 +51,7 @@ def verify_password(plain_password: str, stored_password: str) -> bool:
 @router.post(
     "/login",
     status_code=status.HTTP_200_OK,
+    summary="일반 회원 로그인",
     responses={
         200: {"description": "활성 종목 로그인 또는 recovery_required=true인 복구 전용 응답"},
         403: {"description": "모든 종목의 복구 유예기간 경과"},

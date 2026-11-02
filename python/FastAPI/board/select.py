@@ -23,13 +23,17 @@ logger = logging.getLogger(__name__)
 # 수정 일 : 2026-10-26 / 작업자 : 양태건
 # 기존 게시글 조회 API와 상세 조회 시 조회 수 증가 동작을 유지합니다.
 # 1. 게시글 목록 조회: 필터 조건을 바인딩하고 목록 조회만으로는 조회 수를 올리지 않습니다.
-@router.get("/select", summary="게시글 목록 조회")
+@router.get(
+    "/select", summary="게시글 목록 조회",
+    description="게시글 목록을 조회합니다. 종목, 게시판 분류, 검색어로 필터링할 수 있습니다.",
+    responses={409: {"description": "연결된 게시글 또는 댓글 정보 오류"}, 500: {"description": "게시판 처리 중 서버 오류"}},
+)
 def select_boards(
-    event_category: Optional[EventCategory] = Query(default=None),
-    board_category: Optional[BoardCategory] = Query(default=None),
-    keyword: Optional[str] = Query(default=None, max_length=200),
-    limit: int = Query(default=20, ge=1, le=100),
-    offset: int = Query(default=0, ge=0),
+    event_category: Optional[EventCategory] = Query(default=None, description="종목 분류 필터"),
+    board_category: Optional[BoardCategory] = Query(default=None, description="게시판 분류 필터"),
+    keyword: Optional[str] = Query(default=None, max_length=200, description="제목·내용 검색어"),
+    limit: int = Query(default=20, ge=1, le=100, description="한 번에 가져올 건수"),
+    offset: int = Query(default=0, ge=0, description="건너뛸 건수"),
 ):
     conditions = ["b.comment_seq = 0"]
     params = []
@@ -78,8 +82,12 @@ def select_boards(
 
 
 # 2. 게시글 상세 조회: 조회 수를 원자적으로 1 증가시키고 상세 내용을 돌려줍니다.
-@router.get("/select/{bulletin_seq}", summary="게시글 상세 조회")
-def select_board(bulletin_seq: int = Path(gt=0)):
+@router.get(
+    "/select/{bulletin_seq}", summary="게시글 상세 조회",
+    description="게시글 한 건의 내용을 조회합니다.",
+    responses={404: {"description": "존재하지 않는 게시글"}, 409: {"description": "연결된 게시글 또는 댓글 정보 오류"}, 500: {"description": "게시판 처리 중 서버 오류"}},
+)
+def select_board(bulletin_seq: int = Path(gt=0, description="게시글 번호")):
     # 수정 일 : 2026-10-26 / 작업자 : 양태건
     # 이 기능에서 직접 연결하고, 실패 시 롤백한 뒤 연결을 해제합니다.
     connection = None

@@ -111,6 +111,8 @@ class InsertAppealRequest(BaseModel):
 @router.post(
     "",
     status_code=status.HTTP_201_CREATED,
+    summary="이의신청 등록",
+    description="제재를 받은 회원 본인이 제재 1건당 1회 이의신청을 접수합니다. 소멸되지 않은 경고 또는 이용정지만 이의신청할 수 있습니다.",
     responses={
         status.HTTP_400_BAD_REQUEST: {"description": "이의신청할 수 없는 제재 (종류/기한/소멸)"},
         status.HTTP_403_FORBIDDEN: {"description": "본인에게 부여된 제재가 아님"},

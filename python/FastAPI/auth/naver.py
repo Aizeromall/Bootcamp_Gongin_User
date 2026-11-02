@@ -16,9 +16,11 @@ router = APIRouter(prefix="/naver", tags=["Auth Naver"])
 
 # 수정 일 : 2026-10-28 / 작업자 : 최현준
 # 회원 ID는 앱 입력값이 아닌 네이버 프로필 API의 검증된 응답만 사용합니다.
-@router.post("/mobile", responses=SOCIAL_ERRORS, summary="네이버 모바일 SDK 토큰 로그인")
+@router.post("/mobile", responses=SOCIAL_ERRORS, summary="네이버 모바일 SDK 토큰 로그인",
+             description="네이버 모바일 SDK로 받은 액세스 토큰을 네이버 프로필 API로 검증하고 로그인 정보를 반환합니다.")
 def mobile_naver(response: Response,
-                 access_token: str = Body(embed=True, min_length=1, max_length=4096)) -> dict:
+                 access_token: str = Body(embed=True, min_length=1, max_length=4096,
+                                          description="네이버 SDK 액세스 토큰")) -> dict:
     signing_key()
     profile = provider_request("GET", "https://openapi.naver.com/v1/nid/me",
                                headers={"Authorization": "Bearer " + access_token})
@@ -30,7 +32,8 @@ def mobile_naver(response: Response,
     return finish_identity("naver", subject)
 
 
-@router.get("/login", responses=SOCIAL_ERRORS, summary="네이버 로그인 시작 URL 발급")
+@router.get("/login", responses=SOCIAL_ERRORS, summary="네이버 로그인 시작 URL 발급",
+            description="네이버 로그인 화면으로 이동할 인증 URL과 검증용 state를 발급합니다.")
 def start_naver(request: Request, response: Response) -> dict:
     signing_key()
     client_id = setting("NAVER_CLIENT_ID")
@@ -42,11 +45,12 @@ def start_naver(request: Request, response: Response) -> dict:
         "expires_in": FLOW_SECONDS}
 
 
-@router.get("/callback", responses=SOCIAL_ERRORS, summary="네이버 인증 결과 콜백 (직접 입력용 아님)")
+@router.get("/callback", responses=SOCIAL_ERRORS, summary="네이버 인증 결과 콜백 (직접 입력용 아님)",
+            description="네이버가 로그인 후 호출하는 콜백입니다. 직접 호출하지 않으며 state를 검증한 뒤 로그인 정보를 반환합니다.")
 def naver_callback(request: Request, response: Response,
-                   state: str = Query(min_length=1, max_length=256),
-                   code: str | None = Query(default=None, min_length=1, max_length=4096),
-                   error: str | None = Query(default=None, max_length=256)) -> dict:
+                   state: str = Query(min_length=1, max_length=256, description="로그인 시작 때 발급한 검증용 state"),
+                   code: str | None = Query(default=None, min_length=1, max_length=4096, description="네이버 인증 코드"),
+                   error: str | None = Query(default=None, max_length=256, description="네이버가 전달한 오류 코드(로그인 취소 등)")) -> dict:
     finish_state("naver", state, request, response)
     if error is not None or not code:
         raise HTTPException(status_code=400, detail="네이버 로그인이 취소되었거나 인증 코드가 없습니다.")

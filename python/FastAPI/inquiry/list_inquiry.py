@@ -55,6 +55,8 @@ def group_threads(rows: list[dict]) -> list[dict]:
 # 내 원글과 그에 연결된 모든 깊이의 답변을 조회합니다.
 @router.get(
     "",
+    summary="내 문의 내역 조회",
+    description="회원 아이디로 해당 회원의 문의 내역과 답변을 조회합니다.",
     responses={
         status.HTTP_404_NOT_FOUND: {"description": "존재하지 않는 회원 아이디"},
         status.HTTP_422_UNPROCESSABLE_CONTENT: {"description": "요청 값 검증 실패"},

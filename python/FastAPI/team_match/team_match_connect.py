@@ -40,7 +40,7 @@ from datetime import date, datetime, time, timedelta
 from typing import Annotated, Optional
 
 import pymysql
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, status
 from ..auth.token import current_account
 from . import lineup
 
@@ -65,12 +65,15 @@ def own_actor(account, member):
         raise HTTPException(403, '본인 계정으로만 팀 매칭을 처리할 수 있습니다.')
 
 
-@router.get('/lineup-options', summary='예약 또는 공고의 정원 및 내 팀 출전자 선택 목록', responses={
+@router.get('/lineup-options', summary='예약 또는 공고의 정원 및 내 팀 출전자 선택 목록',
+            description='구장 대여 예약 또는 매칭 신청 게시글 중 하나를 지정해 정원과 내 팀에서 출전자로 선택할 수 있는 팀원 목록을 조회합니다.', responses={
     401: {'description': '로그인 필요'}, 403: {'description': '본인 팀장 아님'},
     404: {'description': '예약·공고 없음'}, 409: {'description': '정원 설정 오류'},
     422: {'description': '예약번호 또는 게시글번호 중 하나만 입력'}, 500: {'description': 'DB 조회 실패'},
 })
-def lineup_options(c_id_seq: str, r_seq: int | None = None, bulletin_seq: int | None = None,
+def lineup_options(c_id_seq: str = Query(..., description="조회하는 회원 ID (팀장)"),
+                   r_seq: int | None = Query(None, description="구장 대여 예약 번호 (bulletin_seq와 둘 중 하나만 입력)"),
+                   bulletin_seq: int | None = Query(None, description="매칭 신청 게시글 번호 (r_seq와 둘 중 하나만 입력)"),
                    account: dict = Depends(current_account)):
     own_actor(account, c_id_seq)
     if (r_seq is None) == (bulletin_seq is None):
@@ -103,12 +106,13 @@ def lineup_options(c_id_seq: str, r_seq: int | None = None, bulletin_seq: int | 
             connection.close()
 
 
-@router.get('/confirmed/{r_seq}', summary='확정된 팀 경기와 출전자 명단 조회', responses={
+@router.get('/confirmed/{r_seq}', summary='확정된 팀 경기와 출전자 명단 조회',
+            description='구장 대여 예약 번호로 성사된 팀 경기와 양 팀 출전자 명단을 조회합니다.', responses={
     401: {'description': '로그인 필요'}, 403: {'description': '경기 참여자가 아님'},
     404: {'description': '확정 경기 없음'}, 409: {'description': '명단 연결 정보 없음'},
     500: {'description': 'DB 조회 실패'},
 })
-def confirmed_lineup(r_seq: int, account: dict = Depends(current_account)):
+def confirmed_lineup(r_seq: int = Path(..., description="구장 대여 예약 번호"), account: dict = Depends(current_account)):
     connection = None
     try:
         connection = connect()
@@ -340,8 +344,12 @@ def post_to_dict(row: dict, team: dict | None) -> dict:
 # 조건 : 본인 구장대여(reservation_category = 2), 취소되지 않음, 아직 매칭 성사 전(r_check = 0), 오늘 이후
 #        이미 매칭신청 글을 쓴 대여는 has_post = true 로 표시 (같은 대여로 글 중복 작성 방지)
 # 예: /team_match/rentals/hong_01
-@router.get("/rentals/{c_id_seq}")
-def select_team_match_rentals(c_id_seq: str):
+@router.get(
+    "/rentals/{c_id_seq}", summary="팀장의 구장 대여 목록 조회",
+    description="팀장이 대여한 구장 목록과 매칭 신청 글 작성 여부를 조회합니다.",
+    responses={500: {"description": "구장 대여 목록 조회 실패"}},
+)
+def select_team_match_rentals(c_id_seq: str = Path(..., description="팀장 회원 ID")):
     connection = None
     try:
         connection = connect()  # DB 연결
@@ -398,6 +406,8 @@ def select_team_match_rentals(c_id_seq: str):
 @router.post(
     "/post",
     status_code=status.HTTP_201_CREATED,
+    summary="매칭 신청 글 작성",
+    description="팀장이 대여한 구장에 연결해 팀 매칭 신청 글을 작성하고 출전자를 선택합니다. 출전자는 구장 정원의 절반이어야 합니다.",
     responses={
         401: {"description": "로그인 정보가 없거나 만료됨"},
         403: {"description": "팀장이 아니거나 본인 구장대여가 아님"},
@@ -501,7 +511,11 @@ def create_team_match_post(
 # 조건 : 같은 종목, 내 팀이 아닌 게시글, 연결된 구장대여가 취소·성사 전이고 오늘 이후
 # 게시글마다 내 팀의 신청 상태(status)를 함께 보냄 → 앱에서 "요청됨" / "글 보기" 표시
 # 예: /team_match/posts?c_id_seq=hong_01
-@router.get("/posts")
+@router.get(
+    "/posts", summary="매칭 신청 글 목록 조회",
+    description="팀 매칭 신청 글 목록을 조회합니다.",
+    responses={500: {"description": "매칭 신청 글 목록 조회 실패"}},
+)
 def select_team_match_posts(
     c_id_seq: str = Query(min_length=4, max_length=50, description="리스트를 보는 회원 (팀장)"),
 ):
@@ -557,6 +571,8 @@ def select_team_match_posts(
 @router.post(
     "/request",
     status_code=status.HTTP_201_CREATED,
+    summary="매칭 신청",
+    description="팀장이 다른 팀의 매칭 신청 글에 신청하고 출전자를 선택합니다. 출전자는 정확히 구장 정원의 절반이어야 합니다.",
     responses={
         401: {"description": "로그인 정보가 없거나 만료됨"},
         403: {"description": "팀장이 아님"},
@@ -644,9 +660,17 @@ def create_team_match_request(
 # 내 게시글에 들어온 신청 팀 목록 (신청받은 팀이 상대 팀 정보를 보고 대결 여부 판단)
 # 게시글 작성자(게시글 팀 팀장)만 조회 가능
 # 예: /team_match/requests/3?c_id_seq=hong_01
-@router.get("/requests/{bulletin_seq}")
+@router.get(
+    "/requests/{bulletin_seq}", summary="매칭 신청 목록 조회",
+    description="매칭 신청 글 작성자가 해당 글에 들어온 신청 목록을 조회합니다.",
+    responses={
+        403: {"description": "게시글 작성자가 아님"},
+        404: {"description": "매칭 신청 게시글이 존재하지 않음"},
+        500: {"description": "매칭 신청 목록 조회 실패"},
+    },
+)
 def select_team_match_requests(
-    bulletin_seq: int,
+    bulletin_seq: int = Path(..., description="매칭 신청 게시글 번호"),
     c_id_seq: str = Query(min_length=4, max_length=50, description="게시글 작성자 (본인 확인용)"),
 ):
     c_id_seq = c_id_seq.strip()
@@ -831,6 +855,8 @@ def answer_team_match_request(c_id_seq: str, bulletin_seq: int, comment_seq: int
 # 신청 수락 → 팀 매칭 성사
 @router.post(
     "/accept",
+    summary="매칭 신청 수락",
+    description="매칭 신청 글 작성자가 들어온 신청을 수락해 팀 경기를 성사시킵니다.",
     responses={
         401: {"description": "로그인 정보가 없거나 만료됨"},
         403: {"description": "게시글 작성자가 아님"},
@@ -852,6 +878,8 @@ def accept_team_match_request(
 # 신청 거절
 @router.post(
     "/reject",
+    summary="매칭 신청 거절",
+    description="매칭 신청 글 작성자가 들어온 신청을 거절합니다.",
     responses={
         401: {"description": "로그인 정보가 없거나 만료됨"},
         403: {"description": "게시글 작성자가 아님"},

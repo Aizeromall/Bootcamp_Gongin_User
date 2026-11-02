@@ -52,6 +52,7 @@ class ChangeCaptainRequest(BaseModel):
     "/captain/{t_id}",
     status_code=status.HTTP_201_CREATED,
     summary="팀장 변경 (진행 중인 구장대여·매칭신청 게시글도 새 팀장에게 이전)",
+    description="현재 팀장이 다른 팀원에게 팀장을 넘깁니다. 진행 중인 구장 대여와 매칭 신청 게시글도 새 팀장에게 이전됩니다.",
     responses={
         403: {"description": "현재 팀장이 아님"},
         404: {"description": "팀 또는 개설 기록이 없음"},

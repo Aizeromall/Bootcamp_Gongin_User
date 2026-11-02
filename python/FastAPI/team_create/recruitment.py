@@ -21,8 +21,15 @@ class RecruitmentDecision(BaseModel):
 
 # 수정 일 : 2026-10-28 / 작업자 : 양태건
 # 팀장이 아닌 회원에게는 본인 신청 상태만 전달하고 다른 신청자 정보를 노출하지 않습니다.
-@router.get("/recruitment/{bulletin_seq}", summary="모집 글의 팀·본인 상태·팀장 신청 목록")
-def select_recruitment(bulletin_seq: int = Path(gt=0), c_id_seq: str = Query(min_length=1, max_length=50)):
+@router.get(
+    "/recruitment/{bulletin_seq}", summary="모집 글의 팀·본인 상태·팀장 신청 목록",
+    description="모집 게시글에 연결된 팀 정보와 조회하는 회원의 가입 상태를 조회합니다. 팀장이면 가입 신청 목록도 함께 반환합니다.",
+    responses={500: {"description": "모집 신청 정보 확인 실패"}},
+)
+def select_recruitment(
+    bulletin_seq: int = Path(gt=0, description="모집 게시글 번호"),
+    c_id_seq: str = Query(min_length=1, max_length=50, description="조회하는 회원 ID"),
+):
     connection = None
     try:
         connection = connect()
@@ -114,21 +121,50 @@ def decide(payload, t_id, accept):
             connection.close()
 
 
-@router.post("/approve/{t_id}", summary="팀장이 가입 신청 승인")
-def approve_recruitment(payload: RecruitmentDecision, t_id: int = Path(gt=0)):
+@router.post(
+    "/approve/{t_id}", summary="팀장이 가입 신청 승인",
+    description="현재 팀장이 대기 중인 가입 신청을 승인합니다.",
+    responses={
+        403: {"description": "현재 팀장이 아님"},
+        404: {"description": "존재하지 않는 신청 회원·팀 또는 가입 신청 없음"},
+        409: {"description": "폐지된 팀, 대기 중이 아닌 신청 또는 신청 회원이 이미 다른 팀에 가입함"},
+        500: {"description": "가입 신청 처리 중 서버 오류"},
+    },
+)
+def approve_recruitment(payload: RecruitmentDecision, t_id: int = Path(gt=0, description="팀 ID")):
     return decide(payload, t_id, True)
 
 
-@router.post("/reject/{t_id}", summary="팀장이 가입 신청 거절")
-def reject_recruitment(payload: RecruitmentDecision, t_id: int = Path(gt=0)):
+@router.post(
+    "/reject/{t_id}", summary="팀장이 가입 신청 거절",
+    description="현재 팀장이 대기 중인 가입 신청을 거절합니다.",
+    responses={
+        403: {"description": "현재 팀장이 아님"},
+        404: {"description": "존재하지 않는 신청 회원·팀 또는 가입 신청 없음"},
+        409: {"description": "폐지된 팀, 대기 중이 아닌 신청 또는 신청 회원이 이미 다른 팀에 가입함"},
+        500: {"description": "가입 신청 처리 중 서버 오류"},
+    },
+)
+def reject_recruitment(payload: RecruitmentDecision, t_id: int = Path(gt=0, description="팀 ID")):
     return decide(payload, t_id, False)
 
 # 최종 수정 일 : 2026-10-28 / 작업자 : 양태건
 
 # 수정 일 : 2026-10-28 / 작업자 : 양태건
 # 모집 글이 없어도 팀 정보 화면에서 현재 팀장이 가입 신청을 관리할 수 있습니다.
-@router.get("/applications/{t_id}", summary="현재 팀장의 가입 신청 목록")
-def select_team_applications(t_id: int = Path(gt=0), c_id_seq: str = Query(min_length=1, max_length=50)):
+@router.get(
+    "/applications/{t_id}", summary="현재 팀장의 가입 신청 목록",
+    description="현재 팀장이 팀에 들어온 가입 신청 목록을 조회합니다.",
+    responses={
+        403: {"description": "현재 팀장이 아님"},
+        404: {"description": "존재하지 않는 팀"},
+        500: {"description": "신청 목록 확인 실패"},
+    },
+)
+def select_team_applications(
+    t_id: int = Path(gt=0, description="팀 ID"),
+    c_id_seq: str = Query(min_length=1, max_length=50, description="조회하는 팀장 회원 ID"),
+):
     from .select import TEAM_SELECT
     connection = None
     try:

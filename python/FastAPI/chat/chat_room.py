@@ -122,9 +122,12 @@ def require_room(cursor, me_id: int, member_id: str, write: bool = False, owner:
 
 # 수정 일 : 2026-10-27 / 작업자 : 양태건
 # 내가 참여 중인 방만 조회합니다.
-@router.get("/rooms", summary="내 채팅방 목록")
-def select_rooms(member_id: str = Depends(current_member), limit: int = Query(default=20, ge=1, le=100),
-                 offset: int = Query(default=0, ge=0)):
+@router.get("/rooms", summary="내 채팅방 목록",
+            description="로그인한 회원이 참여 중인 채팅방 목록을 조회합니다.",
+            responses={401: {"description": "채팅 로그인 토큰 없음 또는 만료"}, 500: {"description": "채팅 처리 중 서버 오류"}})
+def select_rooms(member_id: str = Depends(current_member),
+                 limit: int = Query(default=20, ge=1, le=100, description="한 번에 가져올 건수"),
+                 offset: int = Query(default=0, ge=0, description="건너뛸 건수")):
     with chat_connection() as connection:
         with connection.cursor() as cursor:
             cursor.execute(
@@ -139,8 +142,10 @@ def select_rooms(member_id: str = Depends(current_member), limit: int = Query(de
 
 # 수정 일 : 2026-10-27 / 작업자 : 양태건
 # 참여 권한을 확인한 뒤 방과 참여자 정보를 조회합니다.
-@router.get("/rooms/{me_id}", summary="채팅방 및 참여자 조회")
-def select_room(me_id: int = Path(gt=0), member_id: str = Depends(current_member)):
+@router.get("/rooms/{me_id}", summary="채팅방 및 참여자 조회",
+            description="참여 중인 채팅방 한 곳의 정보와 참여자 목록을 조회합니다.",
+            responses={401: {"description": "채팅 로그인 토큰 없음 또는 만료"}, 403: {"description": "채팅방 참여자가 아니거나 방장 전용 기능"}, 404: {"description": "존재하지 않는 채팅방"}, 409: {"description": "종료된 채팅방이거나 회원·채팅방 정보 오류"}, 500: {"description": "채팅 처리 중 서버 오류"}})
+def select_room(me_id: int = Path(gt=0, description="채팅방 번호"), member_id: str = Depends(current_member)):
     with chat_connection() as connection:
         with connection.cursor() as cursor:
             room = require_room(cursor, me_id, member_id)
@@ -155,8 +160,10 @@ def select_room(me_id: int = Path(gt=0), member_id: str = Depends(current_member
 
 # 수정 일 : 2026-10-27 / 작업자 : 양태건
 # 방장은 나가기를 차단하고 일반 회원의 참여 기록만 삭제합니다.
-@router.delete("/rooms/{me_id}/leave", summary="채팅방 나가기 (방장 제외)")
-def leave_room(me_id: int = Path(gt=0), member_id: str = Depends(current_member)):
+@router.delete("/rooms/{me_id}/leave", summary="채팅방 나가기 (방장 제외)",
+               description="참여 중인 채팅방에서 나갑니다. 방장은 나갈 수 없으며 채팅방 종료를 사용해야 합니다.",
+               responses={401: {"description": "채팅 로그인 토큰 없음 또는 만료"}, 403: {"description": "채팅방 참여자가 아니거나 방장 전용 기능"}, 404: {"description": "존재하지 않는 채팅방"}, 409: {"description": "종료된 채팅방이거나 회원·채팅방 정보 오류"}, 500: {"description": "채팅 처리 중 서버 오류"}})
+def leave_room(me_id: int = Path(gt=0, description="채팅방 번호"), member_id: str = Depends(current_member)):
     with chat_connection(write=True) as connection:
         with connection.cursor() as cursor:
             room = require_room(cursor, me_id, member_id, write=True)
@@ -168,8 +175,10 @@ def leave_room(me_id: int = Path(gt=0), member_id: str = Depends(current_member)
 
 # 수정 일 : 2026-10-27 / 작업자 : 양태건
 # 방장만 방을 종료할 수 있으며 메시지·최초 참여 이력은 보존합니다.
-@router.delete("/rooms/{me_id}", summary="방장의 채팅방 종료")
-def close_room(me_id: int = Path(gt=0), member_id: str = Depends(current_member)):
+@router.delete("/rooms/{me_id}", summary="방장의 채팅방 종료",
+               description="방장이 채팅방을 종료합니다.",
+               responses={401: {"description": "채팅 로그인 토큰 없음 또는 만료"}, 403: {"description": "채팅방 참여자가 아니거나 방장 전용 기능"}, 404: {"description": "존재하지 않는 채팅방"}, 409: {"description": "종료된 채팅방이거나 회원·채팅방 정보 오류"}, 500: {"description": "채팅 처리 중 서버 오류"}})
+def close_room(me_id: int = Path(gt=0, description="채팅방 번호"), member_id: str = Depends(current_member)):
     with chat_connection(write=True) as connection:
         with connection.cursor() as cursor:
             require_room(cursor, me_id, member_id, write=True, owner=True)

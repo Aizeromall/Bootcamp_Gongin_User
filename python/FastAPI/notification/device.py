@@ -53,11 +53,12 @@ def verified_member(cursor, account: dict, requested: str | None) -> str:
     return member
 
 
-@router.post("/devices", responses=ERRORS, summary="본인 FCM 기기 토큰 등록·갱신")
+@router.post("/devices", responses=ERRORS, summary="본인 FCM 기기 토큰 등록·갱신",
+             description="푸시 알림(FCM)을 받을 기기 토큰을 등록하거나 갱신합니다.")
 def register_device(
     f_token: str = Body(min_length=1, max_length=2048, pattern=r"^[!-~]+$",
                         description="Flutter FirebaseMessaging.getToken()으로 받은 문자열"),
-    f_platform: Literal["android", "ios", "web"] = Body(),
+    f_platform: Literal["android", "ios", "web"] = Body(description="기기 플랫폼"),
     c_id_seq: str | None = Body(default=None, min_length=1, max_length=50,
                                description="생략하면 로그인 응답의 기본 종목별 회원 ID"),
     account: dict = Depends(current_account),
@@ -76,9 +77,11 @@ def register_device(
     return {"result": "OK", "c_id_seq": member, "active": True}
 
 
-@router.post("/devices/deactivate", responses=ERRORS, summary="로그아웃 시 본인 기기 알림 해제")
+@router.post("/devices/deactivate", responses=ERRORS, summary="로그아웃 시 본인 기기 알림 해제",
+             description="로그아웃할 때 해당 기기의 푸시 알림 수신을 해제합니다.")
 def deactivate_device(
-    f_token: str = Body(embed=True, min_length=1, max_length=2048, pattern=r"^[!-~]+$"),
+    f_token: str = Body(embed=True, min_length=1, max_length=2048, pattern=r"^[!-~]+$",
+                        description="해제할 FCM 기기 토큰"),
     account: dict = Depends(current_account),
 ) -> dict:
     with device_connection() as connection:

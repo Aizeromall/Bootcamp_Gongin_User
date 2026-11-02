@@ -91,6 +91,8 @@ class InsertReportRequest(BaseModel):
 @router.post(
     "",
     status_code=status.HTTP_201_CREATED,
+    summary="신고 등록",
+    description="회원이 같은 경기에 참여한 다른 회원을 신고합니다. 본인은 신고할 수 없습니다.",
     responses={
         status.HTTP_400_BAD_REQUEST: {"description": "본인 신고 또는 같은 경기 참여 기록 없음"},
         status.HTTP_404_NOT_FOUND: {"description": "존재하지 않는 회원 아이디"},
