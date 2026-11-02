@@ -24,8 +24,10 @@ class InviteRequest(ChatRequest):
         return list(dict.fromkeys(values))
 
 # 방장만 초대할 수 있으며 회원은 초대 즉시 참여합니다.
-@router.post("/rooms/{me_id}/invite", summary="방장의 회원 초대")
-def invite_members(payload: InviteRequest, me_id: int = Path(gt=0), member_id: str = Depends(current_member)):
+@router.post("/rooms/{me_id}/invite", summary="방장의 회원 초대",
+             description="방장이 다른 회원을 채팅방에 초대합니다.",
+             responses={401: {"description": "채팅 로그인 토큰 없음 또는 만료"}, 403: {"description": "채팅방 참여자가 아니거나 방장 전용 기능"}, 404: {"description": "존재하지 않는 채팅방 또는 회원"}, 409: {"description": "종료된 채팅방이거나 회원·채팅방 정보 오류"}, 500: {"description": "채팅 처리 중 서버 오류"}})
+def invite_members(payload: InviteRequest, me_id: int = Path(gt=0, description="채팅방 번호"), member_id: str = Depends(current_member)):
     with chat_connection(write=True) as connection:
         with connection.cursor() as cursor:
             require_room(cursor, me_id, member_id, write=True, owner=True)

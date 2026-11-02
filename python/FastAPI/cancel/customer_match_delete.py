@@ -14,7 +14,7 @@
 import logging
 
 import pymysql
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Path, Query
 
 from ..match.reservation_status import (
     CANCEL_REASONS,
@@ -51,9 +51,19 @@ CATEGORY_CANCELED = 2   # 취소
 # 수정일 2026.10.28
 # 회원 예약 1건 취소 (기타 : 회원이 작성한 사유 글을 그대로 저장)
 # 예: DELETE /cancel/reservation/9002?c_id_seq=dummy1_01&r_c_category=개인 일정
-@router.delete("/reservation/{r_seq}")
+@router.delete(
+    "/reservation/{r_seq}", summary="회원 예약 취소",
+    description="회원이 본인의 예약을 취소합니다. 경기 시작 1시간 전부터는 취소할 수 없습니다.",
+    responses={
+        403: {"description": "본인 예약이 아님"},
+        404: {"description": "존재하지 않는 예약 번호 또는 구장 코드"},
+        409: {"description": "이미 취소된 예약이거나 경기 시작 1시간 전 이후"},
+        422: {"description": "취소 사유 누락 또는 숫자만 입력"},
+        500: {"description": "예약 취소 중 DB 오류"},
+    },
+)
 def delete_customer_reservation(
-    r_seq: int,
+    r_seq: int = Path(..., description="취소할 예약 번호"),
     r_c_category: str = Query(min_length=1, max_length=50, description="회원이 작성한 취소 사유 (기타, 최대 50자)"),
     c_id_seq: str = Query(min_length=4, max_length=50, description="취소를 요청한 회원 (본인 확인용)"),
 ):

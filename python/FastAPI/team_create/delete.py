@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 @router.delete(
     "/delete/{t_id}",
     summary="팀장에 의한 팀 폐지",
+    description="현재 팀장이 팀을 폐지합니다.",
     responses={
         403: {"description": "현재 팀장이 아님"},
         404: {"description": "회원 또는 팀 개설 기록이 없음"},

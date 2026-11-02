@@ -17,7 +17,8 @@ ERRORS = {
 }
 
 
-@router.get('/{g_code}/photos', summary='구장의 사진 목록 조회', responses=ERRORS)
+@router.get('/{g_code}/photos', summary='구장의 사진 목록 조회', responses=ERRORS,
+            description='구장 한 곳에 등록된 사진 목록을 조회합니다.')
 def list_ground_photos(
     g_code: int = Path(gt=0, description='구장 번호'),
     offset: int = Query(0, ge=0, description='목록 시작 위치'),
@@ -52,7 +53,8 @@ def list_ground_photos(
             connection.close()
 
 
-@router.get('/{g_code}/photos/{shoot_seq}', summary='구장 사진 이미지 조회', responses={
+@router.get('/{g_code}/photos/{shoot_seq}', summary='구장 사진 이미지 조회',
+            description='구장 사진 한 장의 이미지 데이터를 반환합니다.', responses={
     **ERRORS, 415: {'description': '지원하지 않는 이미지 데이터 형식'},
 })
 def get_ground_photo(

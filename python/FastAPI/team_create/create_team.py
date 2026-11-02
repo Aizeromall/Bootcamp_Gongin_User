@@ -52,6 +52,7 @@ class CreateTeamRequest(BaseModel):
     "/create",
     status_code=status.HTTP_201_CREATED,
     summary="회원 팀 개설 및 최초 팀장 등록",
+    description="회원이 새 팀을 만들고 최초 팀장으로 등록됩니다. 이미 소속된 팀이 있으면 개설할 수 없습니다.",
     responses={
         404: {"description": "존재하지 않는 회원"},
         409: {"description": "이미 소속 팀이 있거나 팀 개설 정보 충돌"},

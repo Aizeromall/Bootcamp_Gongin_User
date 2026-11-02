@@ -24,6 +24,7 @@ class CreateRoomRequest(ChatRequest):
 @router.post(
     "/rooms", status_code=status.HTTP_201_CREATED, summary="채팅방 생성",
     description="먼저 /chat/token에서 토큰을 발급받아 Authorize에 설정하세요. 기본 팀명으로 만들려면 {}를 전송합니다.",
+    responses={401: {"description": "채팅 로그인 토큰 없음 또는 만료"}, 404: {"description": "존재하지 않는 회원"}, 500: {"description": "채팅 처리 중 서버 오류"}},
 )
 def create_room(
     payload: CreateRoomRequest = Body(openapi_examples={

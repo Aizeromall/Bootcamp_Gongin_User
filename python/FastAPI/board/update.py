@@ -26,8 +26,18 @@ class UpdateBoardRequest(InsertBoardRequest):
 
 
 # 작성자만 수정할 수 있으며 검증 후 하나의 트랜잭션으로 저장합니다.
-@router.put("/update/{bulletin_seq}", summary="본인 게시글 수정")
-def update_board(payload: UpdateBoardRequest, bulletin_seq: int = Path(gt=0)):
+@router.put(
+    "/update/{bulletin_seq}", summary="본인 게시글 수정",
+    description="회원이 본인이 작성한 게시글을 수정합니다. 출전 예약이 연결된 매칭 글은 일반 수정으로 바꿀 수 없습니다.",
+    responses={
+        403: {"description": "본인 게시글이 아님"},
+        404: {"description": "존재하지 않는 회원 또는 게시글"},
+        409: {"description": "출전 예약이 연결된 매칭 글이거나 연결 정보 오류"},
+        422: {"description": "사용할 수 없는 문구 포함 또는 요청 값 검증 실패"},
+        500: {"description": "게시판 처리 중 서버 오류"},
+    },
+)
+def update_board(payload: UpdateBoardRequest, bulletin_seq: int = Path(gt=0, description="수정할 게시글 번호")):
     if '[출전예약:' in payload.board_content or '[출전정보:' in payload.board_content:
         raise HTTPException(status_code=422, detail='게시글에 사용할 수 없는 문구입니다.')
     # 수정 일 : 2026-10-26 / 작업자 : 양태건

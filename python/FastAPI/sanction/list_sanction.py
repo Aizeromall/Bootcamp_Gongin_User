@@ -76,6 +76,8 @@ def sanction_to_dict(row: dict, now: datetime) -> dict:
 # 내 제재 내역 조회: 회원 아이디(c_id_seq)로 받은 제재를 최신순으로 조회
 @router.get(
     "",
+    summary="내 제재 내역 조회",
+    description="회원 아이디로 해당 회원에게 부여된 제재 내역을 조회합니다.",
     responses={
         status.HTTP_404_NOT_FOUND: {"description": "존재하지 않는 회원 아이디"},
         status.HTTP_422_UNPROCESSABLE_CONTENT: {"description": "요청 값 검증 실패"},

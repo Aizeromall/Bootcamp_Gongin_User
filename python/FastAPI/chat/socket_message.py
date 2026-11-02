@@ -29,12 +29,14 @@ class SocketMessage(BaseModel):
 
 # 수정 일 : 2026-10-27 / 작업자 : 양태건
 # 참여자에게 최근·과거·재접속 후 메시지 이력을 반환합니다.
-@router.get("/rooms/{me_id}/messages", summary="참여 채팅방 메시지 조회")
+@router.get("/rooms/{me_id}/messages", summary="참여 채팅방 메시지 조회",
+            description="참여 중인 채팅방의 메시지를 조회합니다. before_id와 after_id 중 하나만 지정할 수 있습니다.",
+            responses={401: {"description": "채팅 로그인 토큰 없음 또는 만료"}, 403: {"description": "채팅방 참여자가 아니거나 방장 전용 기능"}, 404: {"description": "존재하지 않는 채팅방"}, 409: {"description": "종료된 채팅방이거나 회원·채팅방 정보 오류"}, 422: {"description": "before_id와 after_id를 함께 사용했거나 값 검증 실패"}, 500: {"description": "채팅 처리 중 서버 오류"}})
 def select_messages(
-    me_id: int = Path(gt=0), member_id: str = Depends(current_member),
-    limit: int = Query(default=50, ge=1, le=100),
-    before_id: Optional[int] = Query(default=None, gt=0),
-    after_id: Optional[int] = Query(default=None, ge=0),
+    me_id: int = Path(gt=0, description="채팅방 번호"), member_id: str = Depends(current_member),
+    limit: int = Query(default=50, ge=1, le=100, description="한 번에 가져올 건수"),
+    before_id: Optional[int] = Query(default=None, gt=0, description="이 메시지 번호보다 이전 메시지만 조회"),
+    after_id: Optional[int] = Query(default=None, ge=0, description="이 메시지 번호보다 이후 메시지만 조회"),
 ):
     if before_id is not None and after_id is not None:
         raise HTTPException(status_code=422, detail="before_id와 after_id 중 하나만 사용해 주세요.")

@@ -16,9 +16,11 @@ router = APIRouter(prefix="/kakao", tags=["Auth Kakao"])
 
 # 수정 일 : 2026-10-28 / 작업자 : 최현준
 # 앱이 보낸 회원 ID를 신뢰하지 않고 공급자 서버의 토큰 소유자와 앱 ID를 검증합니다.
-@router.post("/mobile", responses=SOCIAL_ERRORS, summary="카카오 모바일 SDK 토큰 로그인")
+@router.post("/mobile", responses=SOCIAL_ERRORS, summary="카카오 모바일 SDK 토큰 로그인",
+             description="카카오 모바일 SDK로 받은 액세스 토큰을 카카오 서버에서 검증하고, 이 앱에서 발급된 토큰일 때 로그인 정보를 반환합니다.")
 def mobile_kakao(response: Response,
-                 access_token: str = Body(embed=True, min_length=1, max_length=4096)) -> dict:
+                 access_token: str = Body(embed=True, min_length=1, max_length=4096,
+                                          description="카카오 SDK 액세스 토큰")) -> dict:
     signing_key()
     expected_app = setting("KAKAO_APP_ID")
     info = provider_request("GET", "https://kapi.kakao.com/v1/user/access_token_info",
@@ -33,7 +35,8 @@ def mobile_kakao(response: Response,
     return finish_identity("kakao", str(subject))
 
 
-@router.get("/login", responses=SOCIAL_ERRORS, summary="카카오 로그인 시작 URL 발급")
+@router.get("/login", responses=SOCIAL_ERRORS, summary="카카오 로그인 시작 URL 발급",
+            description="카카오 로그인 화면으로 이동할 인증 URL과 검증용 state를 발급합니다.")
 def start_kakao(request: Request, response: Response) -> dict:
     signing_key()
     client_id = setting("KAKAO_REST_API_KEY")
@@ -45,11 +48,12 @@ def start_kakao(request: Request, response: Response) -> dict:
         "expires_in": FLOW_SECONDS}
 
 
-@router.get("/callback", responses=SOCIAL_ERRORS, summary="카카오 인증 결과 콜백 (직접 입력용 아님)")
+@router.get("/callback", responses=SOCIAL_ERRORS, summary="카카오 인증 결과 콜백 (직접 입력용 아님)",
+            description="카카오가 로그인 후 호출하는 콜백입니다. 직접 호출하지 않으며 state를 검증한 뒤 로그인 정보를 반환합니다.")
 def kakao_callback(request: Request, response: Response,
-                   state: str = Query(min_length=1, max_length=256),
-                   code: str | None = Query(default=None, min_length=1, max_length=4096),
-                   error: str | None = Query(default=None, max_length=256)) -> dict:
+                   state: str = Query(min_length=1, max_length=256, description="로그인 시작 때 발급한 검증용 state"),
+                   code: str | None = Query(default=None, min_length=1, max_length=4096, description="카카오 인증 코드"),
+                   error: str | None = Query(default=None, max_length=256, description="카카오가 전달한 오류 코드(로그인 취소 등)")) -> dict:
     finish_state("kakao", state, request, response)
     if error is not None or not code:
         raise HTTPException(status_code=400, detail="카카오 로그인이 취소되었거나 인증 코드가 없습니다.")

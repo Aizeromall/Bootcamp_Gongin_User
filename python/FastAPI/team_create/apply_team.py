@@ -60,8 +60,16 @@ class ApplyTeamRequest(BaseModel):
 
 
 # 가입 완료: 회원·팀을 잠그고 중복 소속을 확인한 뒤 가입 기록과 회원 소속을 함께 저장합니다.
-@router.post("/apply/{t_id}", status_code=status.HTTP_201_CREATED, summary="팀 가입 신청 (팀장 승인 대기)")
-def apply_team(payload: ApplyTeamRequest, t_id: int = Path(gt=0)):
+@router.post(
+    "/apply/{t_id}", status_code=status.HTTP_201_CREATED, summary="팀 가입 신청 (팀장 승인 대기)",
+    description="회원이 팀에 가입을 신청합니다. 신청은 팀장이 승인하면 가입이 확정됩니다.",
+    responses={
+        404: {"description": "존재하지 않는 회원, 팀 또는 모집 게시글에 연결된 팀 없음"},
+        409: {"description": "폐지된 팀, 이미 소속된 팀이 있음, 가입 승인 대기 중 또는 가입 정보 충돌"},
+        500: {"description": "팀 가입 처리 중 서버 오류"},
+    },
+)
+def apply_team(payload: ApplyTeamRequest, t_id: int = Path(gt=0, description="가입할 팀 ID")):
     connection = None
     try:
         connection = connect()
@@ -136,8 +144,20 @@ def apply_team(payload: ApplyTeamRequest, t_id: int = Path(gt=0)):
 
 # 수정 일 : 2026-10-27 / 작업자 : 양태건
 # 탈퇴 기록은 삭제하지 않습니다. 현재 팀장은 먼저 다른 회원에게 팀장을 넘겨야 합니다.
-@router.delete("/leave/{t_id}", summary="본인 팀 탈퇴")
-def leave_team(t_id: int = Path(gt=0), c_id_seq: str = Query(min_length=1, max_length=50)):
+@router.delete(
+    "/leave/{t_id}", summary="본인 팀 탈퇴",
+    description="회원이 소속된 팀에서 탈퇴합니다. 현재 팀장은 팀장 변경 또는 팀 폐지 후에 탈퇴할 수 있습니다.",
+    responses={
+        404: {"description": "존재하지 않는 회원 또는 팀, 가입 기록 없음"},
+        409: {"description": "이미 탈퇴했거나 현재 팀장이거나 가입 정보 충돌"},
+        422: {"description": "회원 ID 누락"},
+        500: {"description": "팀 탈퇴 처리 중 서버 오류"},
+    },
+)
+def leave_team(
+    t_id: int = Path(gt=0, description="탈퇴할 팀 ID"),
+    c_id_seq: str = Query(min_length=1, max_length=50, description="탈퇴하는 회원 ID"),
+):
     c_id_seq = c_id_seq.strip()
     if not c_id_seq:
         raise HTTPException(status_code=422, detail="회원 ID를 입력해 주세요.")

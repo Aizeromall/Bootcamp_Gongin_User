@@ -61,6 +61,8 @@ def insert_payment(cursor, reservation: dict, p_method: str) -> dict:
 @router.post(
     "/payment",
     status_code=status.HTTP_201_CREATED,
+    summary="예약 결제",
+    description="회원이 예약에 대한 결제를 기록합니다. 예약 회원과 결제 요청 회원이 같아야 합니다.",
     responses={
         400: {"description": "c_id_seq가 비어 있음"},
         403: {"description": "예약 회원과 결제 요청 회원이 일치하지 않음"},

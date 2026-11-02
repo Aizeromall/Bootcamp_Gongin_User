@@ -86,6 +86,8 @@ def sport_from_customer_id(customer_id_sequence: str) -> str:
 @router.post(
     "/reservation",
     status_code=status.HTTP_201_CREATED,
+    summary="실력매칭 예약",
+    description="회원이 구장의 시간대에 실력매칭을 예약하고 결제 기록을 함께 생성합니다.",
     responses={
         400: {"description": "c_id_seq 또는 예약 시작 시간 형식 오류"},
         404: {"description": "고객 또는 구장 코드가 존재하지 않음"},

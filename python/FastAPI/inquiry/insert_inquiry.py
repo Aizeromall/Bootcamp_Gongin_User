@@ -49,8 +49,12 @@ class InsertInquiryRequest(BaseModel):
 @router.post(
     "",
     status_code=status.HTTP_201_CREATED,
+    summary="문의 등록",
+    description="회원이 문의를 등록하거나 기존 문의에 추가 문의를 등록합니다. 추가 문의는 본인 문의에만 등록할 수 있습니다.",
     responses={
-        status.HTTP_404_NOT_FOUND: {"description": "존재하지 않는 회원 아이디"},
+        status.HTTP_403_FORBIDDEN: {"description": "본인 문의가 아님"},
+        status.HTTP_404_NOT_FOUND: {"description": "존재하지 않는 회원 아이디 또는 문의"},
+        status.HTTP_409_CONFLICT: {"description": "문의 깊이 정보 오류"},
         status.HTTP_422_UNPROCESSABLE_CONTENT: {"description": "요청 값 검증 실패"},
         status.HTTP_500_INTERNAL_SERVER_ERROR: {"description": "문의 등록 실패"},
     },

@@ -45,7 +45,8 @@ MEMBER_SELECT = f"""
 # 수정 일 : 2026-10-30 / 작업자 : 김병재
 # 팀원 목록: 로그인 JWT의 종목 회원 ID 중 하나가 이 팀의 팀원일 때만 조회할 수 있습니다.
 # 응답에는 이름·포지션·등급만 담고 연락처 등 개인정보는 반환하지 않습니다.
-@router.get("/members/{t_id}", summary="내 소속팀 팀원 목록", responses={
+@router.get("/members/{t_id}", summary="내 소속팀 팀원 목록",
+            description="로그인한 회원이 가입된 팀의 팀원 목록을 조회합니다.", responses={
     401: {"description": "로그인 JWT 누락·위조·만료"},
     403: {"description": "내가 가입된 팀이 아님"},
     404: {"description": "존재하지 않거나 폐지된 팀"},

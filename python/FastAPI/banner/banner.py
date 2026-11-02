@@ -30,7 +30,8 @@ def select_rows(sql, params=()):
             connection.close()
 
 
-@router.get('', summary='현재 게시 중인 배너 목록 조회', responses=ERRORS)
+@router.get('', summary='현재 게시 중인 배너 목록 조회', responses=ERRORS,
+            description='노출 기간 안에 있는 배너의 번호, 기간, 이미지 주소를 조회합니다.')
 def list_banners():
     # 시작일·종료일을 포함해 비교하고 false·날짜 NULL은 제외합니다.
     rows = select_rows(f"""SELECT c.c_image_seq, c.c_start, c.c_end
@@ -44,13 +45,14 @@ def list_banners():
     ]}
 
 
-@router.get('/{image_id}/image', summary='게시 중인 배너 이미지 조회', responses={
+@router.get('/{image_id}/image', summary='게시 중인 배너 이미지 조회',
+            description='게시 중인 배너 한 건의 이미지를 반환합니다. 비활성이거나 노출 기간이 지난 배너는 제공하지 않습니다.', responses={
     404: {'description': '게시 대상이 아니거나 이미지 데이터가 없음'},
     415: {'description': '지원하지 않는 이미지 데이터 형식'},
     422: {'description': '잘못된 배너 번호'},
     **ERRORS,
 })
-def get_banner_image(image_id: int = ApiPath(gt=0)):
+def get_banner_image(image_id: int = ApiPath(gt=0, description='배너 선택 번호(c_image_seq)')):
     # 이미지 주소를 직접 알아도 비활성·기간 외 배너는 제공하지 않습니다.
     rows = select_rows(f"""SELECT b.b_image FROM choice c JOIN banner_image b ON b.b_seq=c.b_seq
         WHERE c.c_image_seq=%s AND {ACTIVE} AND b.b_image IS NOT NULL AND OCTET_LENGTH(b.b_image)>0 LIMIT 1""", (image_id,))

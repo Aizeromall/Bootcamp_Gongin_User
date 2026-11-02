@@ -40,7 +40,16 @@ class InsertBoardRequest(BoardTextRequest):
 
 
 # 3. 게시글 작성: 회원 확인 후 작성일은 NOW(), 조회 수는 0으로 저장합니다.
-@router.post("/insert", status_code=status.HTTP_201_CREATED, summary="게시글 작성")
+@router.post(
+    "/insert", status_code=status.HTTP_201_CREATED, summary="게시글 작성",
+    description="회원이 게시글을 작성합니다. 사용할 수 없는 문구가 포함되면 등록할 수 없습니다.",
+    responses={
+        404: {"description": "존재하지 않는 회원"},
+        409: {"description": "연결된 게시글 또는 댓글 정보 오류"},
+        422: {"description": "사용할 수 없는 문구 포함 또는 요청 값 검증 실패"},
+        500: {"description": "게시판 처리 중 서버 오류"},
+    },
+)
 def insert_board(payload: InsertBoardRequest):
     if '[출전예약:' in payload.board_content or '[출전정보:' in payload.board_content:
         raise HTTPException(status_code=422, detail='게시글에 사용할 수 없는 문구입니다.')

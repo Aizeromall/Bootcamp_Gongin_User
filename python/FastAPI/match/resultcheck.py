@@ -10,7 +10,7 @@ import logging
 from typing import Optional
 
 import pymysql
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Path, Query
 
 from ..database import connect  # 공용 DB 연결 함수 (python/FastAPI/database.py)
 
@@ -66,8 +66,15 @@ RESULT_SELECT = """
 # 회원이 참여한 경기결과 목록 조회
 # e_code가 있으면 해당 종목의 결과만 조회
 # 예: /match/result/customer/hong_01?e_code=01
-@router.get("/result/customer/{c_id_seq}")
-def select_results_by_customer(c_id_seq: str, e_code: Optional[str] = None):
+@router.get(
+    "/result/customer/{c_id_seq}", summary="회원의 경기 결과 조회",
+    description="회원이 참여한 경기 결과 목록을 조회합니다. 종목 코드로 필터링할 수 있습니다.",
+    responses={500: {"description": "경기 결과 조회 실패"}},
+)
+def select_results_by_customer(
+    c_id_seq: str = Path(..., description="회원 아이디(customer PK)"),
+    e_code: Optional[str] = Query(None, description="종목 코드 필터"),
+):
     connection = None
     try:
         connection = connect()  # DB 연결
@@ -95,8 +102,12 @@ def select_results_by_customer(c_id_seq: str, e_code: Optional[str] = None):
 
 # 경기결과 1건 상세 조회
 # 주의: "/result/customer/.." 보다 아래에 있어야 "customer"가 c_r_r_seq로 잘못 인식되지 않음
-@router.get("/result/{c_r_r_seq}")
-def select_result(c_r_r_seq: int):
+@router.get(
+    "/result/{c_r_r_seq}", summary="경기 결과 상세 조회",
+    description="경기 결과 번호로 경기 결과 한 건의 상세 정보를 조회합니다.",
+    responses={404: {"description": "존재하지 않는 경기 결과"}, 500: {"description": "경기 결과 조회 실패"}},
+)
+def select_result(c_r_r_seq: int = Path(..., description="경기 결과 번호")):
     connection = None
     try:
         connection = connect()

@@ -22,10 +22,19 @@ logger = logging.getLogger(__name__)
 # 게시글 삭제만 담당하며 댓글 개별 삭제 API는 comment.py에서 관리합니다.
 # 4. 게시글 삭제: 작성자만 삭제할 수 있으며 댓글까지 함께 삭제합니다.
 # 자기 참조 FK는 먼저 연결을 해제한 뒤 삭제하고, 어느 단계든 실패하면 전체 rollback합니다.
-@router.delete("/delete/{bulletin_seq}", summary="본인 게시글 삭제")
+@router.delete(
+    "/delete/{bulletin_seq}", summary="본인 게시글 삭제",
+    description="회원이 본인이 작성한 게시글을 삭제합니다. 출전 예약이 연결된 매칭 글은 삭제할 수 없습니다.",
+    responses={
+        403: {"description": "본인 게시글이 아님"},
+        404: {"description": "존재하지 않는 회원 또는 게시글"},
+        409: {"description": "출전 예약이 연결된 매칭 글이거나 연결 정보 오류"},
+        500: {"description": "게시판 처리 중 서버 오류"},
+    },
+)
 def delete_board(
-    bulletin_seq: int = Path(gt=0),
-    c_id_seq: str = Query(min_length=1, max_length=50),
+    bulletin_seq: int = Path(gt=0, description="삭제할 게시글 번호"),
+    c_id_seq: str = Query(min_length=1, max_length=50, description="삭제를 요청한 회원 아이디(본인 확인용)"),
 ):
     c_id_seq = c_id_seq.strip()
     # 수정 일 : 2026-10-26 / 작업자 : 양태건

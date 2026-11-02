@@ -26,7 +26,8 @@ def fresh_result(account: dict, rows: list[dict]) -> dict:
     return authentication_result(account["sub"], rows[0]["c_login_type"], rows)
 
 
-@router.get("", responses=ERRORS, summary="내 프로필 및 종목별 삭제·복구 상태")
+@router.get("", responses=ERRORS, summary="내 프로필 및 종목별 삭제·복구 상태",
+            description="로그인한 회원의 공통 프로필과 가입 종목별 상태(활성·삭제 신청·복구 가능)를 조회합니다.")
 def get_account(account: dict = Depends(current_account)) -> dict:
     with account_db() as connection, connection.cursor() as cursor:
         rows = load_members(cursor, account["sub"])
@@ -34,7 +35,8 @@ def get_account(account: dict = Depends(current_account)) -> dict:
         return public_profile(rows)
 
 
-@router.patch("/profile", responses=ERRORS, summary="내 공통 개인정보·일반 비밀번호·종목별 포지션 수정")
+@router.patch("/profile", responses=ERRORS, summary="내 공통 개인정보·일반 비밀번호·종목별 포지션 수정",
+              description="허용된 항목만 수정합니다. 선호 종목은 최종 선택 목록을 한 번에 저장하며, 선택 유지·해제·복구·신규 추가를 같은 트랜잭션에서 처리합니다.")
 # ************************
 # 버그 확인 일 : 2026-10-29 / 작업자 : 최현준
 # 1. 버그 발생 위치 : 회원정보 수정 API의 선호 종목 저장 계약
@@ -142,8 +144,10 @@ def insert_sport(cursor, base, sport, position, source, at):
     return row
 
 
-@router.post("/sports", status_code=201, responses=ERRORS, summary="기존 계정에 고정 suffix 종목 추가")
-def add_sport(sport: Literal[1, 2, 3, 4] = Body(), c_position: str = Body(min_length=1, max_length=50),
+@router.post("/sports", status_code=201, responses=ERRORS, summary="기존 계정에 고정 suffix 종목 추가",
+             description="이미 가입한 계정에 새 종목을 추가합니다. 종목별로 허용된 포지션만 선택할 수 있습니다.")
+def add_sport(sport: Literal[1, 2, 3, 4] = Body(description="종목 번호(1~4)"),
+              c_position: str = Body(min_length=1, max_length=50, description="종목별 포지션"),
               account: dict = Depends(current_account)) -> dict:
     if c_position not in POSITION_OPTIONS[sport]:
         raise HTTPException(status_code=422, detail="해당 종목의 허용 포지션을 선택해 주세요.")
@@ -186,7 +190,8 @@ def withdraw(account: dict, sport: int | None) -> dict:
         return {"result": "OK", **summary(rows, at), "session": fresh_result(account, rows)}
 
 
-@router.delete("/sports/{sport}", responses=ERRORS, summary="한 종목 삭제 신청 (30일 유예)")
+@router.delete("/sports/{sport}", responses=ERRORS, summary="한 종목 삭제 신청 (30일 유예)",
+               description="선택한 종목의 삭제를 신청합니다. 신청일부터 30일 안에는 복구할 수 있습니다.")
 # ************************
 # 버그 확인 일 : 2026-10-29 / 위치 : 종목 경로 매개변수 검증
 # 1. 버그 발생 위치 : Literal[int]를 사용한 URL의 /sports/{sport}
@@ -195,17 +200,19 @@ def withdraw(account: dict, sport: int | None) -> dict:
 # 4. 테스트 사항 : 종목 삭제, 중복 신청, 30일 직전/경계/직후 복구 회귀 검사
 # 5. 결과 및 추후 보완 사항 : Mock 통과, 실제 DB 쓰기·프론트 연결은 별도 승인 후 검증
 # ************************
-def withdraw_sport(sport: int = Path(ge=1, le=4), account: dict = Depends(current_account)) -> dict:
+def withdraw_sport(sport: int = Path(ge=1, le=4, description="종목 번호(1~4)"), account: dict = Depends(current_account)) -> dict:
     return withdraw(account, sport)
 
 
-@router.post("/withdraw", responses=ERRORS, summary="활성 종목 전체 삭제 신청 (기존 신청일 유지)")
+@router.post("/withdraw", responses=ERRORS, summary="활성 종목 전체 삭제 신청 (기존 신청일 유지)",
+             description="활성 상태인 모든 종목의 삭제를 신청합니다. 이미 삭제 신청된 종목의 신청일은 바꾸지 않습니다.")
 def withdraw_all(account: dict = Depends(current_account)) -> dict:
     return withdraw(account, None)
 
 
-@router.post("/sports/{sport}/restore", responses=ERRORS, summary="활성 계정에서 30일 내 삭제 신청 종목 복구")
-def restore_sport(sport: int = Path(ge=1, le=4), account: dict = Depends(current_account)) -> dict:
+@router.post("/sports/{sport}/restore", responses=ERRORS, summary="활성 계정에서 30일 내 삭제 신청 종목 복구",
+             description="삭제 신청 후 30일이 지나지 않은 종목을 다시 활성 상태로 복구합니다.")
+def restore_sport(sport: int = Path(ge=1, le=4, description="종목 번호(1~4)"), account: dict = Depends(current_account)) -> dict:
     signing_key()
     with account_db(write=True) as connection, connection.cursor() as cursor:
         rows = load_members(cursor, account["sub"], lock=True)
@@ -239,7 +246,8 @@ def restore_rows(cursor, rows: list[dict], at) -> None:
         row["c_deletdate"] = None
 
 
-@router.get("/recovery", responses=ERRORS, summary="복구 전용 인증으로 복구 가능 종목 확인")
+@router.get("/recovery", responses=ERRORS, summary="복구 전용 인증으로 복구 가능 종목 확인",
+            description="로그인 시 발급된 복구 전용 토큰으로 복구할 수 있는 종목과 유예 기간을 확인합니다.")
 def get_recovery(claims: dict = Depends(recovery_claims)) -> dict:
     with account_db() as connection, connection.cursor() as cursor:
         rows = checked_recovery(cursor, claims)
@@ -248,8 +256,10 @@ def get_recovery(claims: dict = Depends(recovery_claims)) -> dict:
         return {"recovery_required": True, "confirmation": "정말로 복구하시겠습니까?", **summary(rows)}
 
 
-@router.post("/recovery/restore", responses=ERRORS, summary="복구 확인 예: 선택한 유예 종목 복구 및 정상 JWT 발급")
-def restore_account(sports: list[Literal[1, 2, 3, 4]] = Body(embed=True, min_length=1, max_length=4),
+@router.post("/recovery/restore", responses=ERRORS, summary="복구 확인 예: 선택한 유예 종목 복구 및 정상 JWT 발급",
+             description="복구 전용 토큰으로 선택한 유예 종목을 복구하고 정상 로그인 토큰을 발급합니다.")
+def restore_account(sports: list[Literal[1, 2, 3, 4]] = Body(embed=True, min_length=1, max_length=4,
+                                                              description="복구할 종목 번호 목록(중복 불가)"),
                     claims: dict = Depends(recovery_claims)) -> dict:
     if len(sports) != len(set(sports)):
         raise HTTPException(status_code=422, detail="중복 종목은 선택할 수 없습니다.")

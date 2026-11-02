@@ -91,16 +91,17 @@ def finish_identity(provider: str, subject: str) -> dict:
 
 
 @router.post("/social/register", status_code=201, responses=SOCIAL_ERRORS,
-             summary="간편가입 추가 정보 입력 및 종목별 회원 생성")
+             summary="간편가입 추가 정보 입력 및 종목별 회원 생성",
+             description="간편로그인 인증 후 받은 일회용 티켓과 추가 정보를 받아 선택한 종목마다 회원을 생성합니다.")
 def register_social(
     response: Response,
     signup_ticket: str = Body(min_length=1, max_length=256, description="공급자 인증 후 받은 일회용 티켓"),
-    c_name: str = Body(min_length=1, max_length=45),
-    c_address: str = Body(min_length=1, max_length=255),
-    c_phone: str = Body(min_length=1, max_length=20),
-    c_gender: str = Body(min_length=1, max_length=10),
+    c_name: str = Body(min_length=1, max_length=45, description="회원 이름"),
+    c_address: str = Body(min_length=1, max_length=255, description="주소"),
+    c_phone: str = Body(min_length=1, max_length=20, description="전화번호"),
+    c_gender: str = Body(min_length=1, max_length=10, description="성별"),
     c_birthday: str = Body(description="YYYY-MM-DD"),
-    preferred_stocks: list[int] = Body(min_length=1, max_length=4),
+    preferred_stocks: list[int] = Body(min_length=1, max_length=4, description="선호 종목 번호 목록(1~4)"),
     c_position: dict[int, str] = Body(description="종목별 포지션. 예: {\"1\": \"FW\"}"),
 ) -> dict:
     # 새 요청 클래스를 만들지 않고 기존 회원가입 모델의 공백·날짜·종목·포지션 검증을 재사용합니다.
