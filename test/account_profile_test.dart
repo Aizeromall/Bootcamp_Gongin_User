@@ -86,6 +86,15 @@ Future<void> bottom(WidgetTester tester, [String target = '계정 삭제']) asyn
   await tester.pumpAndSettle();
 }
 
+// 수정 일 : 2026-11-02 / 작업자 : 신현진
+// socialLoginProvider가 AsyncNotifier로 바뀌어 login()만 대신하는 가짜 Notifier로 주입합니다.
+class FakeSocialLogin extends SocialLogin {
+  FakeSocialLogin(this.handler);
+  final Future<Map<String, dynamic>> Function(String) handler;
+  @override
+  Future<Map<String, dynamic>> login(String provider) => handler(provider);
+}
+
 void main() {
   testWidgets('회원정보 전화번호에 입력·붙여넣기한 숫자 외 문자를 제거', (tester) async {
     await setup(tester, (_) => response(profile()));
@@ -290,14 +299,16 @@ void main() {
   testWidgets('간편로그인도 복구 확인부터 진행하고 아니오에서는 인증 세션 없음', (tester) async {
     final container = ProviderContainer(
       overrides: [
-        socialLoginProvider.overrideWithValue(
-          (_) async => {
-            'recovery_required': true,
-            'recovery_token': 'mock-recovery',
-            'sports': [
-              {'sport': 1, 'state': 'recoverable'},
-            ],
-          },
+        socialLoginProvider.overrideWith(
+          () => FakeSocialLogin(
+            (_) async => {
+              'recovery_required': true,
+              'recovery_token': 'mock-recovery',
+              'sports': [
+                {'sport': 1, 'state': 'recoverable'},
+              ],
+            },
+          ),
         ),
       ],
     );
@@ -543,3 +554,4 @@ void main() {
 // 최종 수정 일 : 2026-10-29 / 작업자 : 최현준
 // 최종 수정 일 : 2026-10-30 / 작업자 : 최현준
 // 최종 수정 일 : 2026-10-31 / 작업자 : 신현진 (동작 Notifier AsyncNotifier 변환에 맞춰 isLoading 사용)
+// 최종 수정 일 : 2026-11-02 / 작업자 : 신현진 (socialLoginProvider AsyncNotifier 변환에 맞춰 가짜 Notifier 주입)

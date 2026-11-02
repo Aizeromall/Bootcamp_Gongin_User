@@ -42,25 +42,46 @@ final accountActionsProvider = AsyncNotifierProvider<AccountActions, void>(
 );
 
 // 삭제 신청 후 다시 로그인할 때는 복구 토큰만 사용하며 일반 세션을 먼저 만들지 않습니다.
-final accountRecoveryProvider =
-    Provider<Future<Map<String, dynamic>> Function(String, List<int>)>((ref) {
-      final api = ref.watch(memberApiProvider);
-      return (recoveryToken, sports) async {
-        final result = await api.request(
-          '/auth/account/recovery/restore',
-          accessToken: recoveryToken,
-          body: {'sports': sports},
-        );
-        final session = result['session'];
-        if (result['result'] != 'OK' ||
-            session is! Map ||
-            session['access_token'] is! String ||
-            session['recovery_required'] == true) {
-          throw const ApiException(502, '복구 결과를 확인할 수 없습니다. 다시 로그인해 주세요.');
-        }
-        return Map<String, dynamic>.from(session);
-      };
-    });
+// 수정 일 : 2026-11-02 / 작업자 : 신현진
+// 상태관리 방식 변경: 함수 반환 Provider → AsyncNotifier<void>
+// 화면은 ref.read(accountRecoveryProvider.notifier).restore(token, sports)로 호출합니다.
+// 요청 중 AsyncLoading → 성공 AsyncData(null) / 실패 AsyncError (예외는 화면으로 다시 전달)
+final accountRecoveryProvider = AsyncNotifierProvider<AccountRecovery, void>(
+  AccountRecovery.new,
+);
+
+class AccountRecovery extends AsyncNotifier<void> {
+  @override
+  void build() {}
+
+  Future<Map<String, dynamic>> restore(
+    String recoveryToken,
+    List<int> sports,
+  ) async {
+    state = const AsyncLoading();
+    try {
+      final result = await ref
+          .read(memberApiProvider)
+          .request(
+            '/auth/account/recovery/restore',
+            accessToken: recoveryToken,
+            body: {'sports': sports},
+          );
+      final session = result['session'];
+      if (result['result'] != 'OK' ||
+          session is! Map ||
+          session['access_token'] is! String ||
+          session['recovery_required'] == true) {
+        throw const ApiException(502, '복구 결과를 확인할 수 없습니다. 다시 로그인해 주세요.');
+      }
+      if (ref.mounted) state = const AsyncData(null);
+      return Map<String, dynamic>.from(session);
+    } catch (error, stackTrace) {
+      if (ref.mounted) state = AsyncError(error, stackTrace);
+      rethrow;
+    }
+  }
+}
 
 // 저장·삭제 신청을 직렬화합니다. 위젯에서 HTTP나 세션 변경을 복제하지 않습니다.
 // 수정 일 : 2026-10-31 / 작업자 : 신현진
@@ -139,3 +160,4 @@ class AccountActions extends AsyncNotifier<void> {
 // 최종 수정 일 : 2026-10-29 / 작업자 : 최현준
 // 최종 수정 일 : 2026-10-30 / 작업자 : 신현진 (조회 provider AsyncNotifier 변환)
 // 최종 수정 일 : 2026-10-31 / 작업자 : 신현진 (동작 Notifier AsyncNotifier<void> 변환)
+// 최종 수정 일 : 2026-11-02 / 작업자 : 신현진 (accountRecoveryProvider AsyncNotifier 변환)

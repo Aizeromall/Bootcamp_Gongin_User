@@ -35,7 +35,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     // 이전 오류가 쌓여 같은 메시지만 반복되는 것처럼 보이지 않게 합니다.
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     try {
-      final result = await ref.read(socialLoginProvider)(provider);
+      // 수정 일 : 2026-11-02 / 작업자 : 신현진 — socialLoginProvider AsyncNotifier 변환으로 notifier 메서드 호출
+      final result = await ref
+          .read(socialLoginProvider.notifier)
+          .login(provider);
       if (!mounted) return;
       if (result['signup_required'] == true) {
         await Navigator.push(
@@ -148,7 +151,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         ),
       );
       if (yes != true || !mounted) return;
-      result = await ref.read(accountRecoveryProvider)(token, recoverable);
+      // 수정 일 : 2026-11-02 / 작업자 : 신현진 — accountRecoveryProvider AsyncNotifier 변환으로 notifier 메서드 호출
+      result = await ref
+          .read(accountRecoveryProvider.notifier)
+          .restore(token, recoverable);
       if (!mounted || ref.read(sessionProvider) != null) return;
     }
     acceptMemberSession(ref, result);
@@ -272,3 +278,4 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 // 최종 수정 일 : 2026-10-28 / 작업자 : 최현준
 // 최종 수정 일 : 2026-10-29 / 작업자 : 최현준
 // 최종 수정 일 : 2026-10-30 / 작업자 : 최현준
+// 최종 수정 일 : 2026-11-02 / 작업자 : 신현진 (소셜 로그인·계정 복구 AsyncNotifier 호출로 변경)

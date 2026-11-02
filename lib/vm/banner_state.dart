@@ -5,19 +5,31 @@ import '../service/member_api.dart';
 import 'member_state.dart';
 
 // 활성 배너는 서버가 날짜와 게시 여부를 함께 검사한 결과만 사용합니다.
-final bannerProvider = FutureProvider.autoDispose<List<int>>((ref) async {
-  final response = await ref.watch(memberApiProvider).request('/banner');
-  final rows = response['results'];
-  if (rows is! List ||
-      rows.any(
-        (row) =>
-            row is! Map ||
-            row['c_image_seq'] is! int ||
-            row['c_image_seq'] <= 0,
-      )) {
-    throw const ApiException(502, '배너 정보를 확인할 수 없습니다.');
+// 수정 일 : 2026-11-02 / 작업자 : 신현진
+// 상태관리 방식 변경: FutureProvider → AsyncNotifier (조회 로직·autoDispose·retry는 그대로)
+class BannerNotifier extends AsyncNotifier<List<int>> {
+  @override
+  Future<List<int>> build() async {
+    final response = await ref.watch(memberApiProvider).request('/banner');
+    final rows = response['results'];
+    if (rows is! List ||
+        rows.any(
+          (row) =>
+              row is! Map ||
+              row['c_image_seq'] is! int ||
+              row['c_image_seq'] <= 0,
+        )) {
+      throw const ApiException(502, '배너 정보를 확인할 수 없습니다.');
+    }
+    return [for (final row in rows) (row as Map)['c_image_seq'] as int];
   }
-  return [for (final row in rows) (row as Map)['c_image_seq'] as int];
-}, retry: (_, _) => null);
+}
+
+final bannerProvider =
+    AsyncNotifierProvider.autoDispose<BannerNotifier, List<int>>(
+      BannerNotifier.new,
+      retry: (_, _) => null,
+    );
 
 // 최종 수정 일 : 2026-10-30 / 작업자 : 최현준
+// 최종 수정 일 : 2026-11-02 / 작업자 : 신현진 (FutureProvider → AsyncNotifier 변환)

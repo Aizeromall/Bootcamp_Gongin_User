@@ -18,20 +18,41 @@ final socialLogoutProvider = Provider<void>((ref) {
     }
   });
 });
-final socialLoginProvider =
-    Provider<Future<Map<String, dynamic>> Function(String)>((ref) {
-      final service = ref.watch(socialLoginServiceProvider);
-      final api = ref.watch(memberApiProvider);
-      return (provider) async {
-        final token = await service.authenticate(provider);
-        return api.request(
-          provider == 'google'
-              ? '/auth/google/login'
-              : '/auth/$provider/mobile',
-          body: {provider == 'google' ? 'id_token' : 'access_token': token},
-        );
-      };
-    });
+
+// 수정 일 : 2026-11-02 / 작업자 : 신현진
+// 상태관리 방식 변경: 함수 반환 Provider → AsyncNotifier<void>
+// 화면은 ref.read(socialLoginProvider.notifier).login(provider)로 호출하고 처리 중 여부는 state.isLoading입니다.
+// 요청 중 AsyncLoading → 성공 AsyncData(null) / 실패 AsyncError (예외는 화면으로 다시 전달, 중복 클릭은 화면의 busy가 막음)
+class SocialLogin extends AsyncNotifier<void> {
+  @override
+  void build() {}
+
+  Future<Map<String, dynamic>> login(String provider) async {
+    state = const AsyncLoading();
+    try {
+      final token = await ref
+          .read(socialLoginServiceProvider)
+          .authenticate(provider);
+      final result = await ref
+          .read(memberApiProvider)
+          .request(
+            provider == 'google'
+                ? '/auth/google/login'
+                : '/auth/$provider/mobile',
+            body: {provider == 'google' ? 'id_token' : 'access_token': token},
+          );
+      if (ref.mounted) state = const AsyncData(null);
+      return result;
+    } catch (error, stackTrace) {
+      if (ref.mounted) state = AsyncError(error, stackTrace);
+      rethrow;
+    }
+  }
+}
+
+final socialLoginProvider = AsyncNotifierProvider<SocialLogin, void>(
+  SocialLogin.new,
+);
 
 /// 일반·간편 로그인 모두 서버가 돌려준 가입 종목만 사용합니다.
 void acceptMemberSession(WidgetRef ref, Map<String, dynamic> result) {
@@ -45,3 +66,4 @@ void acceptMemberSession(WidgetRef ref, Map<String, dynamic> result) {
   ref.read(sessionProvider.notifier).signIn(result);
 }
 // 최종 수정 일 : 2026-10-28 / 작업자 : 최현준
+// 최종 수정 일 : 2026-11-02 / 작업자 : 신현진 (socialLoginProvider AsyncNotifier 변환)
