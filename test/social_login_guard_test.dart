@@ -36,6 +36,15 @@ Matcher message(String value) => isA<SocialLoginException>().having(
   contains(value),
 );
 
+// 수정 일 : 2026-11-02 / 작업자 : 신현진
+// socialLoginProvider가 AsyncNotifier로 바뀌어 login()만 대신하는 가짜 Notifier로 주입합니다.
+class FakeSocialLogin extends SocialLogin {
+  FakeSocialLogin(this.handler);
+  final Future<Map<String, dynamic>> Function(String) handler;
+  @override
+  Future<Map<String, dynamic>> login(String provider) => handler(provider);
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   for (final provider in ['google', 'kakao', 'naver']) {
@@ -173,12 +182,14 @@ void main() {
       final label = SocialLoginService.labels[provider]!;
       final container = ProviderContainer(
         overrides: [
-          socialLoginProvider.overrideWithValue((_) async {
-            if (attempt++ == 0) {
-              throw SocialLoginException('$label 앱 설정이 필요합니다.');
-            }
-            throw const ApiException(503, '인증 서비스 연결 실패');
-          }),
+          socialLoginProvider.overrideWith(
+            () => FakeSocialLogin((_) async {
+              if (attempt++ == 0) {
+                throw SocialLoginException('$label 앱 설정이 필요합니다.');
+              }
+              throw const ApiException(503, '인증 서비스 연결 실패');
+            }),
+          ),
         ],
       );
       addTearDown(container.dispose);
@@ -202,3 +213,4 @@ void main() {
   }
 }
 // 최종 수정 일 : 2026-10-29 / 작업자 : 최현준
+// 최종 수정 일 : 2026-11-02 / 작업자 : 신현진 (socialLoginProvider AsyncNotifier 변환에 맞춰 가짜 Notifier 주입)

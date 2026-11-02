@@ -73,15 +73,27 @@ final chatConnectionProvider = Provider.autoDispose.family<ChatConnection, int>(
     return connection;
   },
 );
-final chatMessagesProvider = StreamProvider.autoDispose
-    .family<ChatSnapshot, int>((ref, roomId) {
-      if (ref.watch(chatTokenProvider) == null) {
-        return Stream.value(const ChatSnapshot(notice: '채팅 인증이 필요합니다.'));
-      }
-      final connection = ref.watch(chatConnectionProvider(roomId));
-      connection.connect();
-      return connection.changes.stream;
-    });
+
+// 수정 일 : 2026-11-02 / 작업자 : 신현진
+// 상태관리 방식 변경: StreamProvider → StreamNotifier (WebSocket 스트림·연결 생명주기·autoDispose는 그대로)
+// 실시간 메시지는 Future가 아닌 Stream이므로 AsyncNotifier 대신 같은 계열의 StreamNotifier를 사용합니다.
+class ChatMessages extends StreamNotifier<ChatSnapshot> {
+  ChatMessages(this.roomId);
+  final int roomId;
+
+  @override
+  Stream<ChatSnapshot> build() {
+    if (ref.watch(chatTokenProvider) == null) {
+      return Stream.value(const ChatSnapshot(notice: '채팅 인증이 필요합니다.'));
+    }
+    final connection = ref.watch(chatConnectionProvider(roomId));
+    connection.connect();
+    return connection.changes.stream;
+  }
+}
+
+final chatMessagesProvider = StreamNotifierProvider.autoDispose
+    .family<ChatMessages, ChatSnapshot, int>(ChatMessages.new);
 
 // 수정 일 : 2026-10-30 / 작업자 : 김병재
 // 내 ID 기준 전체 채팅방: 가입한 모든 종목 회원 ID로 각각 방 목록을 조회해 하나로 합칩니다(종목·1:1 구분 없음).
@@ -131,3 +143,4 @@ final chatAllRoomsProvider =
 // 최종 수정 일 : 2026-10-27 / 작업자 : 양태건
 // 최종 수정 일 : 2026-10-30 / 작업자 : 김병재 (WebSocket 인증 만료 시 자동 재발급·재연결, 전 종목 채팅방 목록)
 // 최종 수정 일 : 2026-10-30 / 작업자 : 신현진 (조회 provider AsyncNotifier 변환)
+// 최종 수정 일 : 2026-11-02 / 작업자 : 신현진 (chatMessagesProvider StreamNotifier 변환)

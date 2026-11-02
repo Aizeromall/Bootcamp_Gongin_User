@@ -9,7 +9,7 @@ void main() {
   testWidgets('배너를 좌우로 밀어 이전·다음 사진을 볼 수 있음', (tester) async {
     final container = ProviderContainer(
       overrides: [
-        bannerProvider.overrideWith((ref) async => [1, 2]),
+        bannerProvider.overrideWithBuild((ref, notifier) async => [1, 2]),
       ],
     );
     addTearDown(container.dispose);
@@ -32,7 +32,7 @@ void main() {
   testWidgets('4초마다 다음 배너를 표시하고 마지막 다음은 처음으로 돌아감', (tester) async {
     final container = ProviderContainer(
       overrides: [
-        bannerProvider.overrideWith((ref) async => [1, 2]),
+        bannerProvider.overrideWithBuild((ref, notifier) async => [1, 2]),
       ],
     );
     addTearDown(container.dispose);
@@ -60,7 +60,9 @@ void main() {
 
   testWidgets('활성 배너가 없으면 빈 상태를 표시', (tester) async {
     final container = ProviderContainer(
-      overrides: [bannerProvider.overrideWith((ref) async => [])],
+      overrides: [
+        bannerProvider.overrideWithBuild((ref, notifier) async => []),
+      ],
     );
     addTearDown(container.dispose);
     await tester.pumpWidget(
@@ -75,3 +77,4 @@ void main() {
   });
 }
 // 최종 수정 일 : 2026-10-30 / 작업자 : 최현준
+// 최종 수정 일 : 2026-11-02 / 작업자 : 신현진 (bannerProvider AsyncNotifier 변환에 맞춰 overrideWithBuild 사용)
