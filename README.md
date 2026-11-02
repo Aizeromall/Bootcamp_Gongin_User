@@ -1,5 +1,89 @@
 # bootcamp_project_gongin_admin_app
 
+## 신현진 작업 요약 (2026-10-22 ~ 2026-11-02 / 신현진)
+
+회원 앱 흐름(구장 조회 → 예약·결제 → 취소 → 경기 결과 → 팀·팀 매칭 → 등급 점수 → 상태관리) 순서로 정리했습니다. 실제 MySQL 구조·데이터 변경 없이 Mock 테스트로 검증했습니다.
+
+### 모델 · 구장 조회 상태관리 (2026-10-22 ~ 2026-10-23, 2026-10-30 / 신현진)
+
+- `lib/model`의 `Customer`·`Ground`·`MatchManager`·`Headquarter` 모델 파일을 만들고 JSON 변환(`fromJson`·`toJson`)을 작성했습니다.
+- `Customer`에 `c_id`·`c_seq` getter(회원 ID와 종목 번호 분리)를 추가했습니다. 2026-10-30에 `Ground.g_time`·`e_code`(String), `MatchManager.m_department`, `Customer.c_login_type` 필드를 서버 응답에 맞췄습니다.
+- `lib/vm/match_notifier.dart`에 Riverpod 구장 목록·상세 조회 상태관리를 작성했습니다.
+
+### 구장 · 예약 · 결제 조회와 회원 예약 취소 (2026-10-23 ~ 2026-10-26 / 신현진)
+
+- `GET /match/ground` 구장 조회, 회원별 예약·결제 조회, `DELETE /cancel/reservation/{r_seq}` 회원 예약 취소 API를 추가했습니다.
+- 예약에 `r_category`(1 예약 / 2 취소)를 두고 `GET /match/reservation/customer/{c_id_seq}?r_category=2`로 취소 내역을 조회합니다. 결제 중복 저장은 409로 거절합니다.
+- 예약에 경기매니저(`m_id`)를 연결했습니다.
+
+### 구장 전체 대여 Version 2 (2026-10-26 / 신현진)
+
+- 구장 조회를 `python/FastAPI/ground` 폴더로 옮기고 `/ground` prefix로 등록했습니다.
+- 기존 `reservation` 테이블을 `reservation_category`(1 실력 매칭 / 2 구장 대여)로 구분해 구장 대여 예약·조회·취소 API(`/ground/reservation/...`)를 추가했습니다. 대여 취소 사유는 `r_c_category`에 회원이 작성한 글을 저장합니다.
+
+### 경기 결과 조회 (2026-10-23 ~ 2026-10-26 / 신현진)
+
+- `GET /match/result/customer/{c_id_seq}`, `GET /match/result/{c_r_r_seq}`로 회원 본인의 경기 결과 목록·상세를 조회합니다.
+- 결과에 출석 여부(`c_r_r_attendance`)와 부상 기록(`c_r_r_injury`, 기본값 `_`)을 추가하고 구장·경기매니저 정보를 함께 반환합니다.
+
+### 팀 경기 매칭 · 팀장 변경 (2026-10-26 ~ 2026-10-28 / 신현진)
+
+- `python/FastAPI/team_match/team_match_connect.py`: 매칭신청 게시글(`board_a_write`)과 댓글로 팀 대 팀 경기 신청·수락·거절을 처리합니다. 신청 팀 정보에는 팀 점수(`t_rating`)를 함께 조회해 팀 레벨 표시에 사용합니다.
+- `POST /team/captain/{t_id}` 팀장 변경 API를 추가했습니다. 결제 기록은 기존 결제자에게 유지합니다.
+- 회원 직접 취소는 사유를 직접 작성하는 `기타`만 허용하고, 작성한 글을 `r_c_category`에 저장하도록 규칙을 정리했습니다.
+
+### 회원 · 팀 등급 점수 조회 (2026-10-29 / 신현진)
+
+- `python/FastAPI/rating/rating_search.py`: `GET /rating/tiers`(등급 구간), `GET /rating/summary/{c_id_seq}`(현재 점수·등급·다음 등급까지 남은 점수·최근 변동), `GET /rating/history/{c_id_seq}`(경기별 전·후 점수와 변동) API를 추가했습니다.
+- 점수가 기록되지 않은 경기는 이전 경기 후 점수(없으면 시작 점수 1500)로 채우고 변동은 `after - before`로 계산합니다.
+- 회원 앱의 MY 티어 카드는 `/rating/summary`를 사용합니다. `/rating/history`·`/rating/tiers`는 아직 화면에 연결하지 않았습니다.
+
+### Riverpod AsyncNotifier 상태관리 전환 (2026-10-30 ~ 2026-11-02 / 신현진)
+
+- 서버 조회 provider 14개를 `FutureProvider`에서 `AsyncNotifier`로 바꿨습니다(PR #38). 조회 로직·키·autoDispose·자동 재시도 비활성화는 유지했습니다.
+- 버튼 동작 Notifier 3개(`AccountActions`, `CaptainTransfer`, `RecruitmentAction`)를 `AsyncNotifier<void>`로 바꾸고, 화면은 `ref.watch(...).isLoading`으로 처리 중을 표시합니다(PR #39).
+- 남은 비동기 provider를 정리했습니다(PR #41). `bannerProvider`는 `AsyncNotifier`, `socialLoginProvider`·`accountRecoveryProvider`는 `AsyncNotifier<void>`(`login()`·`restore()`), `chatMessagesProvider`는 `StreamNotifier`로 바꿨습니다. 구장 대여 조회는 화면 파일에서 `lib/vm/rental_state.dart`의 `AsyncNotifier`로 옮겼습니다.
+- 코드 생성(riverpod_generator)은 사용하지 않고 기존 수동 선언 방식을 유지합니다. 서비스 객체 provider(`memberApiProvider` 등)는 함수형 `Provider`로 남아 있습니다.
+
+## 김병재 작업 요약 (2026-10-23 ~ 2026-11-02 / 김병재)
+
+회원 앱 흐름(로그인 유지 → 종목 통합 화면 → 내 팀 → 채팅 → 문의·신고·제재 → API 문서) 순서로 정리했습니다.
+
+### 로그인 토큰 자동 갱신 · 자동 로그인 (2026-10-30 / 김병재)
+
+- `POST /auth/refresh`: 만료 후 7일 이내의 로그인 JWT를 DB에서 활성 종목을 다시 확인한 뒤 재발급합니다. 서명·발급자·용도는 기존 검증 기준과 같습니다.
+- `MemberApi`가 401을 받으면 `AuthRefresh`가 로그인 JWT 또는 채팅 토큰을 한 번만 갱신하고 원래 요청을 다시 보냅니다. 갱신 요청 자신은 재시도하지 않습니다.
+- 로그인 JWT만 기기 보안 저장소(Android Keystore·iOS Keychain, `SessionStorage`)에 보관하고 앱 재실행 시 자동 로그인합니다. 실패하면 기존 시작 화면을 그대로 사용합니다.
+
+### 가입 종목 통합 화면 (종목 Dropdown 제거, 2026-10-30 / 김병재)
+
+- `memberIdsProvider`로 로그인 계정의 모든 가입 종목 회원 ID를 구합니다.
+- 예약 내역·경기 결과·문의·제재 화면이 종목 선택 없이 모든 종목의 기록을 합쳐 보여줍니다(`AllMembersDocumentNotifier`, `AllHistoryNotifier`, `ApiContent(allMembers: true)`). 예약 내역은 경기 날짜·시작 시각 최신순입니다.
+- 상세 화면은 내 종목 회원 ID 중 하나의 기록일 때만 표시합니다. 제재·경고 횟수는 종목 회원 ID별로 나눠 보여줍니다.
+
+### 내 팀 탭 (2026-10-30 / 김병재)
+
+- `GET /my_team`: 로그인 JWT의 모든 종목 소속팀과 승인 대기 중인 신청 팀을 한 번에 조회합니다.
+- `GET /my_team/members/{t_id}`: 팀원만 조회할 수 있으며 팀장을 맨 앞에 둡니다. 승인된 팀원만 포함합니다.
+- 팀 탭에 종목별 소속팀·팀 등급(rating 구간표)·팀원 목록과 팀장 전용 가입 신청 승인·거절을 표시합니다.
+
+### 채팅 자동 인증 · 전 종목 채팅방 (2026-10-30 / 김병재)
+
+- 로그인 JWT가 있으면 채팅 화면을 열 때 `POST /chat/session-token`으로 채팅 토큰을 자동 발급합니다(비밀번호 입력 없음).
+- 가입한 모든 종목 회원 ID로 채팅방 목록을 각각 조회해 하나로 합치고, 방마다 종목과 내 역할(방장/참여)을 표시합니다. 방에 들어갈 때는 그 방에 참여한 종목으로 맞춥니다.
+- WebSocket이 인증 만료(1008)로 닫히면 채팅 토큰을 재발급하고 자동으로 다시 연결합니다.
+
+### 문의 · 신고 · 제재 · 이의신청 API (2026-10-23 ~ 2026-10-27 / 김병재)
+
+- 문의(2026-10-23): `POST /inquiry/insert`, `GET /inquiry/list`.
+- 신고(2026-10-26): `POST /report/insert`, `GET /report/list`.
+- 제재(2026-10-27): `GET /sanction/list`.
+- 이의신청(2026-10-27): `POST /appeal/insert`, `GET /appeal/list`.
+
+### API 문서(Swagger) 정리 (2026-11-02 / 김병재)
+
+- 회원 FastAPI 전체 라우터에 Swagger `summary`·`description`·오류 응답(`responses`)·파라미터 설명을 추가했습니다(PR #42). API 동작은 바꾸지 않았습니다.
+
 ## 회원 화면 설정 (2026-10-30 / 최현준)
 
 - MY → 설정 → 화면 모드에서 시스템 설정 따르기·라이트·다크를 선택합니다. 선택값은 기기에 저장됩니다.
